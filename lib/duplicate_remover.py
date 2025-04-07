@@ -47,40 +47,46 @@ class DuplicateRemover:
                     event_groups[event_id] = []
                 event_groups[event_id].append(event)
         
-        success = True
-        # Process each group of duplicates
+        # Build lists for eventIDs and CDs to be used in bulk deletion
+        # Keep the first event of each eventID group, delete the rest
+        event_ids_to_delete = []
+        cds_to_delete = []
+        
         for event_id, events in event_groups.items():
             if len(events) <= 1:
                 continue  # Skip if not actually a duplicate
-            
-            # Keep first event, delete the rest
+                
+            # Skip the first event (keep it), add the rest to delete list
             for i, event in enumerate(events):
                 if i == 0:
                     continue  # Keep the first one
-                
-                # Delete duplicate event
-                if not self.delete_duplicate_event(
-                    session=session,
-                    index=metadata['index'],
-                    event_id=event_id,
-                    cd=event['cd'],
-                    earliest=metadata['earliest_epoch'],
-                    latest=metadata['latest_epoch']
-                ):
-                    self.logger.warning(f"Failed to delete duplicate event: {event_id}")
-                    success = False
+                    
+                event_ids_to_delete.append(event_id)
+                cds_to_delete.append(event['cd'])
         
-        return success
+        if not event_ids_to_delete:
+            self.logger.info("No duplicate events to delete after filtering")
+            return True
+            
+        # Execute bulk deletion
+        return self.delete_duplicate_events_bulk(
+            session=session,
+            index=metadata['index'],
+            event_ids=event_ids_to_delete,
+            cds=cds_to_delete,
+            earliest=metadata['earliest_epoch'],
+            latest=metadata['latest_epoch']
+        )
     
-    def delete_duplicate_event(self, session, index, event_id, cd, earliest, latest):
+    def delete_duplicate_events_bulk(self, session, index, event_ids, cds, earliest, latest):
         """
-        Delete a duplicate event from Splunk
+        Delete multiple duplicate events from Splunk in a single query
         
         Args:
             session (requests.Session): Authenticated Splunk session
             index (str): Splunk index name
-            event_id (str): Event ID to delete
-            cd (str): CD value for the event
+            event_ids (list): List of event IDs to delete
+            cds (list): List of CD values corresponding to event IDs
             earliest (int): Start time in epoch format
             latest (int): End time in epoch format
         
@@ -88,12 +94,19 @@ class DuplicateRemover:
             bool: True if deletion was successful, False otherwise
         """
         try:
+            # Build OR conditions for eventIDs and CDs
+            event_id_conditions = ' OR '.join([f'eventID="{event_id}"' for event_id in event_ids])
+            cd_conditions = ' OR '.join([f'cd="{cd}"' for cd in cds])
+            
+            # Construct the delete query with all conditions
             delete_query = f"""
             search index={index} earliest={earliest} latest={latest}
             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-            | search eventID="{event_id}" cd="{cd}"
+            | search ({event_id_conditions}) ({cd_conditions})
             | delete
             """
+            
+            self.logger.info(f"Deleting {len(event_ids)} duplicate events in bulk")
             
             url = f"{self.config['splunk']['url']}/services/search/jobs"
             payload = {
@@ -106,7 +119,7 @@ class DuplicateRemover:
             response.raise_for_status()
             job_id = response.json()['sid']
             
-            self.logger.debug(f"Delete job submitted: {job_id} for event {event_id}")
+            self.logger.debug(f"Bulk delete job submitted: {job_id}")
             
             # Wait for delete job completion
             is_done = False
@@ -120,12 +133,18 @@ class DuplicateRemover:
                 if status['isDone']:
                     is_done = True
                 else:
+                    progress = round(float(status['doneProgress']) * 100, 2)
+                    self.logger.debug(f"Delete job {job_id} in progress: {progress}%")
                     time.sleep(2)
             
-            self.stats_tracker.increment_delete_success()
+            # Increment stats counter for each deleted event
+            for _ in range(len(event_ids)):
+                self.stats_tracker.increment_delete_success()
+                
             return True
             
         except Exception as e:
-            self.logger.error(f"Error deleting duplicate event: {str(e)}")
+            self.logger.error(f"Error in bulk deletion: {str(e)}")
+            # Increment failure counter only once for the bulk operation
             self.stats_tracker.increment_delete_failure()
             return False
