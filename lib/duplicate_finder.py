@@ -23,14 +23,14 @@ class DuplicateFinder:
         self.stats_tracker = stats_tracker
         self.csv_dir = config.get('general', 'csv_dir', fallback='csv_output')
     
-    def generate_timespan_windows(self, start_time, end_time, window_minutes=10):
+    def generate_timespan_windows(self, start_time, end_time, window_minutes=5):
         """
         Generate time windows for searches
         
         Args:
             start_time (str): Start time in ISO format
             end_time (str): End time in ISO format
-            window_minutes (int, optional): Size of each window in minutes. Defaults to 10.
+            window_minutes (int, optional): Size of each window in minutes. Defaults to 5.
         
         Returns:
             list: List of (start, end) tuples for each time window
