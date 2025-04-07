@@ -1,5 +1,7 @@
 # Misc
 configs/config.ini
+csv_output/
+processed_csv/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
