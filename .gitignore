@@ -1,5 +1,5 @@
 # Misc
-*.ini
+#configs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -174,4 +174,3 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-config.ini
