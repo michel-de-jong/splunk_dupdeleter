@@ -23,6 +23,18 @@ class FileProcessor:
         self.logger = logger
         self.csv_dir = config.get('general', 'csv_dir', fallback='csv_output')
         self.processed_dir = config.get('general', 'processed_dir', fallback='processed_csv')
+        
+        # Create directories if they don't exist
+        self._ensure_directories_exist()
+    
+    def _ensure_directories_exist(self):
+        """
+        Create required directories if they don't exist
+        """
+        for directory in [self.csv_dir, self.processed_dir]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                self.logger.info(f"Created directory: {directory}")
     
     def get_unprocessed_csv_files(self):
         """
@@ -97,6 +109,11 @@ class FileProcessor:
             bool: True if successful, False otherwise
         """
         try:
+            # Ensure processed directory exists
+            if not os.path.exists(self.processed_dir):
+                os.makedirs(self.processed_dir)
+                self.logger.info(f"Created directory: {self.processed_dir}")
+                
             filename = os.path.basename(csv_file)
             tar_filename = filename.replace('.csv', '.tgz')
             tar_path = os.path.join(self.processed_dir, tar_filename)
