@@ -4,6 +4,10 @@ Splunk Duplicate Event Finder and Remover
 Main script to handle duplicate event detection and removal in Splunk Cloud
 """
 
+# Check required modules first before importing any other modules
+from lib.module_checker import check_modules
+check_modules()
+
 import argparse
 import os
 import concurrent.futures
