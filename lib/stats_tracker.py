@@ -15,62 +15,58 @@ class StatsTracker:
             'search_api_calls': {'success': 0, 'failure': 0},
             'delete_api_calls': {'success': 0, 'failure': 0}
         }
-        self.initialized_display = False
+        self.display_initialized = False
     
     def increment_search_success(self):
         """Increment successful search API calls counter"""
         self.stats['search_api_calls']['success'] += 1
-        self.update_stats_display()
+        self.update_search_display()
     
     def increment_search_failure(self):
         """Increment failed search API calls counter"""
         self.stats['search_api_calls']['failure'] += 1
-        self.update_stats_display()
+        self.update_search_display()
     
     def increment_delete_success(self):
         """Increment successful delete API calls counter"""
         self.stats['delete_api_calls']['success'] += 1
-        self.update_stats_display()
+        self.update_delete_display()
     
     def increment_delete_failure(self):
         """Increment failed delete API calls counter"""
         self.stats['delete_api_calls']['failure'] += 1
-        self.update_stats_display()
+        self.update_delete_display()
     
     def initialize_display(self):
         """Initialize the stats display area"""
-        if not self.initialized_display:
-            # Print the initial stats section with placeholders
+        if not self.display_initialized:
             print("=== Splunk Duplicate Remover Statistics ===")
-            print(f"Search API Calls: Success: 0 | Failures: 0")
-            print(f"Delete API Calls: Success: 0 | Failures: 0")
-            print("=========================================")
-            # Move cursor back up to the stats section
-            sys.stdout.write("\033[3A")  # Move cursor up 3 lines
-            sys.stdout.flush()
-            self.initialized_display = True
+            self.display_initialized = True
+            self.update_search_display()
+            self.update_delete_display()
     
-    def update_stats_display(self):
-        """Update statistics display without clearing the screen"""
+    def update_search_display(self):
+        """Update search statistics"""
         try:
-            if not self.initialized_display:
+            if not self.display_initialized:
                 self.initialize_display()
             
-            # Move to the search stats line
-            sys.stdout.write("\033[1B")  # Move down 1 line from current position
-            # Clear line and write updated search stats
-            sys.stdout.write("\r\033[K")  # Clear current line
-            sys.stdout.write(f"Search API Calls: Success: {self.stats['search_api_calls']['success']} | Failures: {self.stats['search_api_calls']['failure']}")
+            # Print all stats on the same line with carriage return
+            print(f"\rSearch API Calls: Success: {self.stats['search_api_calls']['success']} | Failures: {self.stats['search_api_calls']['failure']}")
+            #sys.stdout.flush()
+        except Exception:
+            # Fallback to non-dynamic display if terminal doesn't support ANSI codes
+            pass
+    
+    def update_delete_display(self):
+        """Update delete statistics"""
+        try:
+            if not self.display_initialized:
+                self.initialize_display()
             
-            # Move to the delete stats line
-            sys.stdout.write("\033[1B")  # Move down 1 line from current position
-            # Clear line and write updated delete stats
-            sys.stdout.write("\r\033[K")  # Clear current line
-            sys.stdout.write(f"Delete API Calls: Success: {self.stats['delete_api_calls']['success']} | Failures: {self.stats['delete_api_calls']['failure']}")
-            
-            # Move back to the top of the stats section
-            sys.stdout.write("\033[2A")  # Move cursor up 2 lines
-            sys.stdout.flush()
+            # Print all stats on the same line with carriage return
+            print(f"\rDelete API Calls: Success: {self.stats['delete_api_calls']['success']} | Failures: {self.stats['delete_api_calls']['failure']}")
+            #sys.stdout.flush()
         except Exception:
             # Fallback to non-dynamic display if terminal doesn't support ANSI codes
             pass

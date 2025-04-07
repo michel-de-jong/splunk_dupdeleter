@@ -75,7 +75,7 @@ class DuplicateFinder:
                 | stats first(cd) as cd count by eventID
                 | search count>1 
                 | table cd eventID]
-            | fields host source sourcetype _time _raw eventID cd
+            | fields index _time eventID cd
             """
 
             url = f"{self.config['splunk']['url']}/services/search/jobs"

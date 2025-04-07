@@ -49,8 +49,15 @@ class SplunkAuthenticator:
             session.verify = verify_ssl
             
             # Test authentication by making a simple API call
-            test_url = f"{self.config['splunk']['url']}/services/server/info"
-            response = session.get(test_url, params={'output_mode': 'json'})
+            test_url = f"{self.config['splunk']['url']}/services/search/jobs/export"
+            response = session.post(
+                test_url, 
+                data={
+                    'search': 'search index=_internal | head 1',
+                    'output_mode': 'json',
+                    'earliest_time': '-1m'
+                    },
+            )
             response.raise_for_status()
             
             self.logger.info("Successfully authenticated to Splunk Cloud using JWT token")
