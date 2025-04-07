@@ -1,0 +1,14 @@
+[general]
+csv_dir = csv_output
+processed_dir = processed_csv
+log_file = splunk_duplicate_remover.log
+
+[splunk]
+url = https://your-splunk-cloud-instance.splunkcloud.com
+jwt_token = your_jwt_token_here
+verify_ssl = False
+
+[search]
+index = your_index_name
+start_time = 2025-04-06T00:00:00
+end_time = 2025-04-07T00:00:00
