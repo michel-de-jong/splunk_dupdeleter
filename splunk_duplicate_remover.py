@@ -23,12 +23,16 @@ from lib.stats_tracker import StatsTracker
 def main():
     """Main entry point for the application"""
     parser = argparse.ArgumentParser(description='Splunk Duplicate Event Finder and Remover')
-    parser.add_argument('--config', required=True, help='Path to configuration file (INI or JSON)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
     
-    # Load configuration
-    config = ConfigLoader(args.config).load()
+    try:
+        # Load configuration from default path (configs/config.ini)
+        config = ConfigLoader().load()
+    except FileNotFoundError as e:
+        print(f"Error: {str(e)}")
+        print("Please ensure configs/config.ini exists and is properly configured.")
+        return False
     
     # Setup logging
     logger = setup_logger(config, args.debug)

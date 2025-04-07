@@ -9,16 +9,14 @@ import os
 class ConfigLoader:
     """
     Handles loading configuration from either INI or JSON files
+    Default configuration path is configs/config.ini
     """
     
-    def __init__(self, config_file):
+    def __init__(self):
         """
-        Initialize with the path to a configuration file
-        
-        Args:
-            config_file (str): Path to configuration file (INI or JSON)
+        Initialize with the default configuration path (configs/config.ini)
         """
-        self.config_file = config_file
+        self.config_file = os.path.join('configs', 'config.ini')
         
     def load(self):
         """
@@ -26,6 +24,9 @@ class ConfigLoader:
         
         Returns:
             configparser.ConfigParser: Configuration object
+            
+        Raises:
+            FileNotFoundError: If configs/config.ini is not found
         """
         if not os.path.exists(self.config_file):
             raise FileNotFoundError(f"Configuration file not found: {self.config_file}")
