@@ -6,11 +6,11 @@ Deleting duplicate events in Splunk
     - Take this into account and use screen or tmux if needed
 - The script checks for completion of search jobs every 5 seconds
 - The script will store the results in a locally created CSV when the find search is ready
-- The script will use the "eventID" and "cd" fields in the CSV to create the deletion searches, and polls every 5  seconds if the deletion search is finished. The script will log amount of deleted events per search.
+- The script will use the "eventID" and "cd" fields in the CSV to create the deletion searches, and polls every 5 seconds if the deletion search is finished. The script will log amount of deleted events per search.
 <br/><br/>
 The following settings are tweakable via the config.ini file:
 - max_workes (max concurrent Splunk searches)
-    - Defaults to 6
+    - Defaults to 1
 - Batch (amount of duplicated events being deleted at once) (defines how big the OR statement in the search will be)
     - Defaults to 5000
 - TTL 
