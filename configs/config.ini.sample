@@ -2,7 +2,7 @@
 csv_dir = csv_output
 processed_dir = processed_csv
 log_file = splunk_duplicate_remover.log
-max_workers = 6     ## Max concurrent searches to fire to Splunk
+max_workers = 1     ## Max concurrent searches to fire to Splunk, start conservative
 batch_size = 5000   ## For better performance, separate into smaller batches of 5000 events
 
 [splunk]
