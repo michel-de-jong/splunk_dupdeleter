@@ -62,6 +62,112 @@ class DuplicateRemover:
             earliest=metadata['earliest_epoch'],
             latest=metadata['latest_epoch']
         )
+
+    def delete_duplicate_events_bulk(self, session, index, event_ids, cds, earliest, latest):
+        """
+        Delete multiple duplicate events from Splunk in a single query
+        
+        Args:
+            session (requests.Session): Authenticated Splunk session
+            index (str): Splunk index name
+            event_ids (list): List of event IDs to delete
+            cds (list): List of CD values corresponding to event IDs
+            earliest (int): Start time in epoch format
+            latest (int): End time in epoch format
+        
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        try:
+            # For better performance, separate into smaller batches of 1000 events
+            batch_size = 1000
+            total_batches = (len(event_ids) + batch_size - 1) // batch_size
+            
+            self.logger.info(f"Splitting deletion into {total_batches} batches (max {batch_size} events per batch)")
+            
+            for batch_num in range(total_batches):
+                start_idx = batch_num * batch_size
+                end_idx = min(start_idx + batch_size, len(event_ids))
+                
+                # Get current batch of IDs and CDs
+                batch_event_ids = event_ids[start_idx:end_idx]
+                batch_cds = cds[start_idx:end_idx]
+                
+                # Build combined conditions for batch using only CD values
+                # This is the key change - we use the CD values directly which are unique identifiers
+                pair_conditions = []
+                for i in range(len(batch_event_ids)):
+                    pair_conditions.append(f'(_cd="{batch_cds[i]}")')
+                
+                # Join the pair conditions with OR
+                search_condition = ' OR '.join(pair_conditions)
+                
+                # Construct the delete query using _cd directly
+                delete_query = f"""
+                search index={index} earliest={earliest} latest={latest} ({search_condition})
+                | delete
+                """
+                
+                self.logger.info(f"Deleting batch {batch_num+1}/{total_batches} with {len(batch_event_ids)} events")
+                self.logger.debug(f"Delete query: {delete_query}")
+                
+                url = f"{self.config['splunk']['url']}/services/search/jobs"
+                payload = {
+                    'search': delete_query,
+                    'output_mode': 'json',
+                    'exec_mode': 'normal'
+                }
+                
+                response = session.post(url, data=payload)
+                response.raise_for_status()
+                job_id = response.json()['sid']
+                
+                self.logger.info(f"Bulk delete job submitted: {job_id}")
+                
+                # Wait for delete job completion
+                is_done = False
+                status_url = f"{self.config['splunk']['url']}/services/search/jobs/{job_id}"
+                
+                while not is_done:
+                    response = session.get(f"{status_url}", params={'output_mode': 'json'})
+                    response.raise_for_status()
+                    status = response.json()['entry'][0]['content']
+                    
+                    if status['isDone']:
+                        is_done = True
+                        # Check if the job was successful
+                        if status.get('isFailed', False):
+                            self.logger.error(f"Delete job {job_id} failed: {status.get('messages', 'No details')}")
+                            return False
+                        else:
+                            # Check actual events deleted from the job results
+                            results_url = f"{self.config['splunk']['url']}/services/search/jobs/{job_id}/results"
+                            try:
+                                results_response = session.get(
+                                    results_url,
+                                    params={'output_mode': 'json', 'count': 0}
+                                )
+                                results_response.raise_for_status()
+                                results_json = results_response.json()
+                                deleted_count = len(results_json.get('results', []))
+                                self.logger.info(f"Batch {batch_num+1}: Deleted {deleted_count} events")
+                            except Exception as res_e:
+                                self.logger.warning(f"Couldn't get deletion results: {str(res_e)}")
+                    else:
+                        progress = round(float(status['doneProgress']) * 100, 2)
+                        self.logger.debug(f"Delete job {job_id} in progress: {progress}%")
+                        time.sleep(2)
+            
+                # Increment stats counter for each deleted event in this batch
+                for _ in range(len(batch_event_ids)):
+                    self.stats_tracker.increment_delete_success()
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error in bulk deletion: {str(e)}")
+            self.stats_tracker.increment_delete_failure()
+            return False
     
     def delete_duplicate_events_bulk(self, session, index, event_ids, cds, earliest, latest):
         """

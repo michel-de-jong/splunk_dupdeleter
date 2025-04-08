@@ -71,16 +71,16 @@ class DuplicateFinder:
             
             self.logger.info(f"Starting integrated find/remove for timespan {earliest} to {latest} (iteration {iteration})")
             
-            # Simplified search query without NOT clauses
+            # Modified search query to ensure _cd is correctly captured
             search_query = f"""
             search index={index} earliest={earliest_epoch} latest={latest_epoch}
             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
             | search 
                 [| search index={index} earliest={earliest_epoch} latest={latest_epoch}
                 | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-                | stats first(cd) as cd count by eventID
+                | stats first(_cd) as cd count by eventID
                 | search count>1 
-                | table cd eventID]
+                | table eventID cd]
             | table index eventID cd
             """
             
@@ -127,6 +127,8 @@ class DuplicateFinder:
                         return self.find_duplicates_integrated(
                             session, index, earliest, latest, duplicate_remover, file_processor, iteration + 1
                         )
+                else:
+                    self.logger.warning(f"Failed to remove duplicates for {csv_filepath}")
             else:
                 self.logger.info(f"No duplicate events found in timespan {earliest} to {latest} (iteration {iteration})")
             
@@ -138,84 +140,76 @@ class DuplicateFinder:
             self.stats_tracker.increment_search_failure()
             return None
             
-    def find_duplicates(self, session, index, earliest, latest, iteration=1):
-        """Original find_duplicates method - kept for compatibility"""
-        try:
-            earliest_epoch = int(earliest.timestamp())
-            latest_epoch = int(latest.timestamp())
+    # def find_duplicates(self, session, index, earliest, latest, iteration=1):
+    #     """Original find_duplicates method - kept for compatibility"""
+    #     try:
+    #         earliest_epoch = int(earliest.timestamp())
+    #         latest_epoch = int(latest.timestamp())
             
-            # Create unique lookup name for this time window including iteration
-            base_lookup_name = f"duplicate_events_{earliest_epoch}_{latest_epoch}"
-            lookup_names = []  # Keep track of all lookup names for this window
-            current_lookup_name = f"{base_lookup_name}_part{iteration}"
+    #         # Create unique lookup name for this time window including iteration
+    #         base_lookup_name = f"duplicate_events_{earliest_epoch}_{latest_epoch}"
+    #         lookup_names = []  # Keep track of all lookup names for this window
+    #         current_lookup_name = f"{base_lookup_name}_part{iteration}"
             
-            # For NOT clause, we need to combine all previous lookups
-            if iteration > 1:
-                lookup_names = [f"{base_lookup_name}_part{i}" for i in range(1, iteration)]
-                not_clauses = [f"[| inputlookup {name}]" for name in lookup_names]
-                not_clause = f"NOT ({' OR '.join(not_clauses)})"
-            else:
-                not_clause = ""
+    #         # For NOT clause, we need to combine all previous lookups
+    #         if iteration > 1:
+    #             lookup_names = [f"{base_lookup_name}_part{i}" for i in range(1, iteration)]
+    #             not_clauses = [f"[| inputlookup {name}]" for name in lookup_names]
+    #             not_clause = f"NOT ({' OR '.join(not_clauses)})"
+    #         else:
+    #             not_clause = ""
             
-            # Base search that finds duplicates
-            search_query = f"""
-            search index={index} earliest={earliest_epoch} latest={latest_epoch} {not_clause}
-            | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-            | search 
-                [| search index={index} earliest={earliest_epoch} latest={latest_epoch}
-                | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-                | stats first(cd) as cd count by eventID
-                | search count>1 
-                | table cd eventID]
-            | table index eventID cd
-            """
+    #         # Base search that finds duplicates
+    #         search_query = f"""
+    #         search index={index} earliest={earliest_epoch} latest={latest_epoch} {not_clause}
+    #         | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
+    #         | search 
+    #             [| search index={index} earliest={earliest_epoch} latest={latest_epoch}
+    #             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
+    #             | stats first(cd) as cd count by eventID
+    #             | search count>1 
+    #             | table cd eventID]
+    #         | table index eventID cd
+    #         """
             
-            # Run search and get results first
-            url = f"{self.config['splunk']['url']}/services/search/jobs"
-            payload = {
-                'search': search_query,
-                'output_mode': 'json',
-                'exec_mode': 'normal'
-            }
+    #         # Run search and get results first
+    #         url = f"{self.config['splunk']['url']}/services/search/jobs"
+    #         payload = {
+    #             'search': search_query,
+    #             'output_mode': 'json',
+    #             'exec_mode': 'normal'
+    #         }
             
-            response = session.post(url, data=payload)
-            response.raise_for_status()
-            job_id = response.json()['sid']
+    #         response = session.post(url, data=payload)
+    #         response.raise_for_status()
+    #         job_id = response.json()['sid']
             
-            self.logger.debug(f"Search job submitted: {job_id} for timespan {earliest} to {latest} (iteration {iteration})")
+    #         self.logger.debug(f"Search job submitted: {job_id} for timespan {earliest} to {latest} (iteration {iteration})")
             
-            # Wait for job completion and handle results
-            csv_filepath = self._wait_for_job_and_export_results(
-                session, job_id, index, earliest, latest, 
-                earliest_epoch, latest_epoch, iteration
-            )
+    #         # Wait for job completion and handle results
+    #         csv_filepath = self._wait_for_job_and_export_results(
+    #             session, job_id, index, earliest, latest, 
+    #             earliest_epoch, latest_epoch, iteration
+    #         )
             
-            # # If we got results, create lookup table from CSV
-            # if csv_filepath:
-            #     # Upload CSV as lookup file
-            #     if self._upload_lookup_file(session, csv_filepath, current_lookup_name):
-            #         self.logger.debug(f"Created lookup {current_lookup_name} with results from {csv_filepath}")
-            #     else:
-            #         self.logger.error(f"Failed to create lookup from {csv_filepath}")
-            
-            # If we hit the result limit, run another iteration
-            if csv_filepath and self._hit_result_limit(csv_filepath):
-                self.logger.info(f"Hit 10000 result limit, running additional search (iteration {iteration + 1})")
-                next_filepath = self.find_duplicates(session, index, earliest, latest, iteration + 1)
+    #         # If we hit the result limit, run another iteration
+    #         if csv_filepath and self._hit_result_limit(csv_filepath):
+    #             self.logger.info(f"Hit 10000 result limit, running additional search (iteration {iteration + 1})")
+    #             next_filepath = self.find_duplicates(session, index, earliest, latest, iteration + 1)
                 
-                # Cleanup all temporary lookups after last iteration
-                if not next_filepath:
-                    lookup_names.append(current_lookup_name)
-                    for name in lookup_names:
-                        self._cleanup_lookup(session, name)
+    #             # Cleanup all temporary lookups after last iteration
+    #             if not next_filepath:
+    #                 lookup_names.append(current_lookup_name)
+    #                 for name in lookup_names:
+    #                     self._cleanup_lookup(session, name)
             
-            self.stats_tracker.increment_search_success()
-            return csv_filepath
+    #         self.stats_tracker.increment_search_success()
+    #         return csv_filepath
             
-        except Exception as e:
-            self.logger.error(f"Error submitting search: {str(e)}")
-            self.stats_tracker.increment_search_failure()
-            return None
+    #     except Exception as e:
+    #         self.logger.error(f"Error submitting search: {str(e)}")
+    #         self.stats_tracker.increment_search_failure()
+    #         return None
 
     def _wait_for_job_and_export_results(self, session, job_id, index, earliest, latest, earliest_epoch, latest_epoch, iteration):
         """
@@ -297,66 +291,3 @@ class DuplicateFinder:
         import csv
         with open(csv_filepath, 'r') as f:
             return sum(1 for _ in csv.reader(f)) > 10000
-
-    def _cleanup_lookup(self, session, lookup_name):
-        """Remove temporary lookup file"""
-        try:
-            lookup_url = f"{self.config['splunk']['url']}/services/data/lookup-table-files/{lookup_name}.csv"
-            response = session.delete(lookup_url)
-            response.raise_for_status()
-            self.logger.debug(f"Cleaned up temporary lookup: {lookup_name}")
-        except Exception as e:
-            self.logger.error(f"Error cleaning up lookup {lookup_name}: {str(e)}")
-
-    # def _upload_lookup_file(self, session, csv_filepath, lookup_name):
-    #     """
-    #     Upload CSV file as a lookup using Splunk REST API
-        
-    #     Args:
-    #         session (requests.Session): Authenticated Splunk session
-    #         csv_filepath (str): Path to local CSV file
-    #         lookup_name (str): Name for the lookup table
-        
-    #     Returns:
-    #         bool: True if successful, False otherwise
-    #     """
-    #     try:
-    #         # For Splunk Cloud, we need to specify the app context and owner
-    #         app = self.config.get('splunk', 'app', fallback='search')
-    #         owner = self.config.get('splunk', 'username', fallback=None)
-            
-    #         # First ensure the lookup definition exists
-    #         definition_url = f"{self.config['splunk']['url']}/services/data/transforms/lookups"
-    #         definition_data = {
-    #             'name': lookup_name,
-    #             'filename': f"{lookup_name}.csv",
-    #             'app': app
-    #         }
-            
-    #         if owner:
-    #             definition_data['owner'] = owner
-                
-    #         definition_response = session.post(definition_url, data=definition_data)
-    #         definition_response.raise_for_status()
-
-    #         # Then upload the actual file
-    #         lookup_url = f"{self.config['splunk']['url']}/services/data/uploads/lookup_file_upload"
-    #         with open(csv_filepath, 'rb') as f:
-    #             files = {'lookup_file': (f"{lookup_name}.csv", f, 'text/csv')}
-    #             data = {
-    #                 'app': app,
-    #                 'name': f"{lookup_name}.csv"
-    #             }
-                
-    #             if owner:
-    #                 data['owner'] = owner
-                    
-    #             response = session.post(lookup_url, files=files, data=data)
-    #             response.raise_for_status()
-                
-    #         self.logger.debug(f"Successfully uploaded lookup file: {lookup_name}")
-    #         return True
-            
-    #     except Exception as e:
-    #         self.logger.error(f"Error uploading lookup file: {str(e)}")
-    #         return False

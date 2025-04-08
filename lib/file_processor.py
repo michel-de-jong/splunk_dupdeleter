@@ -108,7 +108,7 @@ class FileProcessor:
     
     def mark_as_processed(self, csv_file):
         """
-        Mark a CSV file as processed by compressing and moving it
+        Mark a CSV file as processed by compressing and moving it to a time-based subdirectory
         
         Args:
             csv_file (str): Path to CSV file
@@ -117,14 +117,24 @@ class FileProcessor:
             bool: True if successful, False otherwise
         """
         try:
-            # Ensure processed directory exists
-            if not os.path.exists(self.processed_dir):
-                os.makedirs(self.processed_dir)
-                self.logger.info(f"Created directory: {self.processed_dir}")
-                
+            # Extract metadata to get timestamp info
+            metadata = self.extract_metadata_from_filename(csv_file)
+            if not metadata:
+                self.logger.error(f"Could not extract metadata from filename: {csv_file}")
+                return False
+
+            # Create subdirectory based on start_time (YYYYMMDDHH format)
+            date_hour_subdir = metadata['start_time'][:10]  # Extract YYYYMMDDHH from timestamp
+            target_dir = os.path.join(self.processed_dir, date_hour_subdir)
+            
+            # Create subdirectory if it doesn't exist
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir)
+                self.logger.info(f"Created subdirectory: {target_dir}")
+
             filename = os.path.basename(csv_file)
             tar_filename = filename.replace('.csv', '.tgz')
-            tar_path = os.path.join(self.processed_dir, tar_filename)
+            tar_path = os.path.join(target_dir, tar_filename)
             
             # Create tar.gz file
             with tarfile.open(tar_path, "w:gz") as tar:
