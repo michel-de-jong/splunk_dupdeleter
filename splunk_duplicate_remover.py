@@ -76,9 +76,11 @@ def main():
 
 def run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger):
     """Run integrated search and delete process in parallel batches"""
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-        for i in range(0, len(time_windows), 6):
-            batch = time_windows[i:i+6]
+    max_workers = int(duplicate_finder.config['general'].get('max_workers', 6))  # Default to 6 if not configured
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for i in range(0, len(time_windows), max_workers):
+            batch = time_windows[i:i+max_workers]
             
             # Submit batch of searches
             batch_futures = [

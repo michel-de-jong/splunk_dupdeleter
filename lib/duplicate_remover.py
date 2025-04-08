@@ -66,22 +66,10 @@ class DuplicateRemover:
     def delete_duplicate_events_bulk(self, session, index, event_ids, cds, earliest, latest):
         """
         Delete multiple duplicate events from Splunk in a single query
-        
-        Args:
-            session (requests.Session): Authenticated Splunk session
-            index (str): Splunk index name
-            event_ids (list): List of event IDs to delete
-            cds (list): List of CD values corresponding to event IDs
-            earliest (int): Start time in epoch format
-            latest (int): End time in epoch format
-        
-        Returns:
-            bool: True if deletion was successful, False otherwise
         """
         try:
-            # For better performance, separate into smaller batches of 5000 events
-            #batch_size = 5000
-            batch_size = 10000
+            # Get batch size from config, default to 5000 if not specified
+            batch_size = int(self.config['general'].get('batch_size', 5000))
             total_batches = (len(event_ids) + batch_size - 1) // batch_size
             
             self.logger.info(f"Splitting deletion into {total_batches} batches (max {batch_size} events per batch)")
@@ -119,7 +107,7 @@ class DuplicateRemover:
                     'search': delete_query,
                     'output_mode': 'json',
                     'exec_mode': 'normal',
-                    'ttl': '20'  # Set TTL to 20 seconds
+                    'ttl': self.config['splunk'].get('ttl', '20')  # Get TTL from config, default to 20
                 }
                 
                 response = session.post(url, data=payload)

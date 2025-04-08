@@ -98,7 +98,7 @@ class DuplicateFinder:
                 'search': search_query,
                 'output_mode': 'json',
                 'exec_mode': 'normal',
-                'ttl': '20'  # Set TTL to 20 seconds
+                'ttl': self.config['splunk'].get('ttl', '20')  # Get TTL from config, default to 20
             }
             
             response = session.post(url, data=payload)

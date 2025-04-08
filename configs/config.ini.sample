@@ -2,11 +2,14 @@
 csv_dir = csv_output
 processed_dir = processed_csv
 log_file = splunk_duplicate_remover.log
+max_workers = 6     ## Max concurrent searches to fire to Splunk
+batch_size = 5000   ## For better performance, separate into smaller batches of 5000 events
 
 [splunk]
 url = https://your-splunk-cloud-instance.splunkcloud.com
 jwt_token = your_jwt_token_here
-verify_ssl = False
+verify_ssl = True
+ttl = 20            ## Job time-to-live in seconds
 
 [search]
 index = your_index_name
