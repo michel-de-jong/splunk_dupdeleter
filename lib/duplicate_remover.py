@@ -79,8 +79,9 @@ class DuplicateRemover:
             bool: True if deletion was successful, False otherwise
         """
         try:
-            # For better performance, separate into smaller batches of 1000 events
-            batch_size = 1000
+            # For better performance, separate into smaller batches of 5000 events
+            #batch_size = 5000
+            batch_size = 10000
             total_batches = (len(event_ids) + batch_size - 1) // batch_size
             
             self.logger.info(f"Splitting deletion into {total_batches} batches (max {batch_size} events per batch)")
@@ -118,7 +119,7 @@ class DuplicateRemover:
                     'search': delete_query,
                     'output_mode': 'json',
                     'exec_mode': 'normal',
-                    'ttl': '60'  # Set TTL to 1 minutes (60 seconds)
+                    'ttl': '20'  # Set TTL to 20 seconds
                 }
                 
                 response = session.post(url, data=payload)
@@ -159,7 +160,7 @@ class DuplicateRemover:
                     else:
                         progress = round(float(status['doneProgress']) * 100, 2)
                         self.logger.debug(f"Delete job {job_id} in progress: {progress}%")
-                        time.sleep(2)
+                        time.sleep(5)
             
                 # Increment stats counter for each deleted event in this batch
                 for _ in range(len(batch_cds)):

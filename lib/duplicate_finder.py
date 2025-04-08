@@ -89,7 +89,7 @@ class DuplicateFinder:
                 | stats first(_cd) as cd count by eventID
                 | search count>1 
                 | table eventID cd]
-            | table index eventID cd
+            | table eventID cd
             """
             
             # Run search and get results
@@ -98,7 +98,7 @@ class DuplicateFinder:
                 'search': search_query,
                 'output_mode': 'json',
                 'exec_mode': 'normal',
-                'ttl': '60'  # Set TTL to 1 minute (60 seconds)
+                'ttl': '20'  # Set TTL to 20 seconds
             }
             
             response = session.post(url, data=payload)
