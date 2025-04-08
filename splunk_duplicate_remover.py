@@ -20,6 +20,9 @@ from lib.duplicate_remover import DuplicateRemover
 from lib.file_processor import FileProcessor
 from lib.stats_tracker import StatsTracker
 
+__name__ = "splunk_duplicate_remover.py"
+__author__ = "Michel de Jong"
+
 def main():
     """Main entry point for the application"""
     parser = argparse.ArgumentParser(description='Splunk Duplicate Event Finder and Remover')
@@ -112,5 +115,5 @@ def process_time_window(duplicate_finder, duplicate_remover, file_processor, ses
         duplicate_finder.logger.error(f"Error processing time window {start_time} to {end_time}: {str(e)}")
         return False
 
-if __name__ == "__main__":
+if __name__ == "splunk_duplicate_remover.py":
     main()
