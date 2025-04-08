@@ -48,8 +48,100 @@ class DuplicateFinder:
         
         self.logger.info(f"Generated {len(windows)} search windows")
         return windows
-    
+
+    def find_duplicates_integrated(self, session, index, earliest, latest, duplicate_remover, file_processor):
+        """
+        Find duplicates and immediately process them for removal
+        
+        Args:
+            session (requests.Session): Authenticated Splunk session
+            index (str): Splunk index name
+            earliest (datetime): Start time for search window
+            latest (datetime): End time for search window
+            duplicate_remover (DuplicateRemover): Instance for removing duplicates
+            file_processor (FileProcessor): Instance for processing CSV files
+            
+        Returns:
+            str: Path to final CSV file or None if no duplicates found
+        """
+        try:
+            earliest_epoch = int(earliest.timestamp())
+            latest_epoch = int(latest.timestamp())
+            
+            self.logger.info(f"Starting integrated find/remove for timespan {earliest} to {latest}")
+            
+            # Base search that finds duplicates - without needing to consider already deleted events
+            search_query = f"""
+            search index={index} earliest={earliest_epoch} latest={latest_epoch}
+            | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
+            | search 
+                [| search index={index} earliest={earliest_epoch} latest={latest_epoch}
+                | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
+                | stats first(cd) as cd count by eventID
+                | search count>1 
+                | table cd eventID]
+            | table index eventID cd
+            """
+            
+            # Run search and get results first
+            url = f"{self.config['splunk']['url']}/services/search/jobs"
+            payload = {
+                'search': search_query,
+                'output_mode': 'json',
+                'exec_mode': 'normal'
+            }
+            
+            response = session.post(url, data=payload)
+            response.raise_for_status()
+            job_id = response.json()['sid']
+            
+            self.logger.debug(f"Search job submitted: {job_id} for timespan {earliest} to {latest}")
+            
+            # Wait for job completion and handle results
+            csv_filepath = self._wait_for_job_and_export_results(
+                session, job_id, index, earliest, latest, 
+                earliest_epoch, latest_epoch, 1
+            )
+            
+            # If we found duplicates, process them immediately
+            if csv_filepath:
+                self.logger.info(f"Found duplicates in timespan {earliest} to {latest}, processing now")
+                
+                # Extract metadata from CSV file
+                metadata = file_processor.extract_metadata_from_filename(csv_filepath)
+                if not metadata:
+                    return None
+                
+                # Process events from CSV
+                events = file_processor.read_events_from_csv(csv_filepath)
+                
+                # Delete duplicates
+                success = duplicate_remover.remove_duplicates(session, events, metadata)
+                
+                # Mark as processed if successful
+                if success:
+                    file_processor.mark_as_processed(csv_filepath)
+                
+                # Check if we hit the result limit and need to run again for this time window
+                if self._hit_result_limit(csv_filepath) and success:
+                    self.logger.info(f"Hit 10000 result limit, running additional search for same timespan")
+                    # Run the search again on the same time window after duplicates were removed
+                    return self.find_duplicates_integrated(
+                        session, index, earliest, latest, duplicate_remover, file_processor
+                    )
+            else:
+                self.logger.info(f"No duplicate events found in timespan {earliest} to {latest}")
+            
+            self.stats_tracker.increment_search_success()
+            return csv_filepath
+            
+        except Exception as e:
+            self.logger.error(f"Error in integrated find/remove: {str(e)}")
+            self.stats_tracker.increment_search_failure()
+            return None
+            
     def find_duplicates(self, session, index, earliest, latest, iteration=1):
+        """Original find_duplicates method - kept for compatibility"""
         try:
             earliest_epoch = int(earliest.timestamp())
             latest_epoch = int(latest.timestamp())
@@ -219,16 +311,19 @@ class DuplicateFinder:
         try:
             # For Splunk Cloud, we need to specify the app context and owner
             app = self.config.get('splunk', 'app', fallback='search')
-            owner = self.config.get('splunk', 'username')
+            owner = self.config.get('splunk', 'username', fallback=None)
             
             # First ensure the lookup definition exists
             definition_url = f"{self.config['splunk']['url']}/services/data/transforms/lookups"
             definition_data = {
                 'name': lookup_name,
                 'filename': f"{lookup_name}.csv",
-                'app': app,
-                'owner': owner
+                'app': app
             }
+            
+            if owner:
+                definition_data['owner'] = owner
+                
             definition_response = session.post(definition_url, data=definition_data)
             definition_response.raise_for_status()
 
@@ -238,9 +333,12 @@ class DuplicateFinder:
                 files = {'lookup_file': (f"{lookup_name}.csv", f, 'text/csv')}
                 data = {
                     'app': app,
-                    'owner': owner,
                     'name': f"{lookup_name}.csv"
                 }
+                
+                if owner:
+                    data['owner'] = owner
+                    
                 response = session.post(lookup_url, files=files, data=data)
                 response.raise_for_status()
                 

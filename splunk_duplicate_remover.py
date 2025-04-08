@@ -64,37 +64,22 @@ def main():
     # Generate time windows for searches
     time_windows = duplicate_finder.generate_timespan_windows(start_time, end_time)
     
-    # Phase 1: Run searches to identify duplicates
-    logger.info(f"Starting Phase 1: Finding duplicate events in {len(time_windows)} time windows")
-    run_parallelized_searches(duplicate_finder, session, index, time_windows, logger)
+    # Run integrated process to find and remove duplicates in each time window
+    logger.info(f"Starting integrated search and remove process for {len(time_windows)} time windows")
+    run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger)
     
-    # Phase 2: Process CSV files and delete duplicates
-    logger.info("Starting Phase 2: Processing CSV files and deleting duplicates")
-    unprocessed_files = file_processor.get_unprocessed_csv_files()
-    
-    if not unprocessed_files:
-        logger.info("No unprocessed CSV files found.")
-        return True
-    
-    logger.info(f"Found {len(unprocessed_files)} unprocessed CSV files to process")
-    
-    # Process each CSV file
-    for csv_file in unprocessed_files:
-        logger.info(f"Processing {csv_file}")
-        process_file(csv_file, duplicate_remover, file_processor, session, logger)
-    
-    logger.info("Completed processing all CSV files")
+    logger.info("Completed processing all time windows")
     return True
 
-def run_parallelized_searches(duplicate_finder, session, index, time_windows, logger):
-    """Run searches in parallel batches"""
+def run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger):
+    """Run integrated search and delete process in parallel batches"""
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         for i in range(0, len(time_windows), 6):
             batch = time_windows[i:i+6]
             
             # Submit batch of searches
             batch_futures = [
-                executor.submit(duplicate_finder.find_duplicates, session, index, start, end)
+                executor.submit(process_time_window, duplicate_finder, duplicate_remover, file_processor, session, index, start, end)
                 for start, end in batch
             ]
             
@@ -108,27 +93,22 @@ def run_parallelized_searches(duplicate_finder, session, index, time_windows, lo
             # Sleep briefly between batches to avoid overwhelming Splunk
             time.sleep(2)
 
-def process_file(csv_file, duplicate_remover, file_processor, session, logger):
-    """Process a single CSV file to delete duplicates"""
+def process_time_window(duplicate_finder, duplicate_remover, file_processor, session, index, start_time, end_time):
+    """Process a single time window to find and delete duplicates"""
     try:
-        # Extract metadata from CSV file
-        metadata = file_processor.extract_metadata_from_filename(csv_file)
-        if not metadata:
-            return False
+        # Find duplicates for this time window
+        csv_file = duplicate_finder.find_duplicates_integrated(
+            session, 
+            index, 
+            start_time, 
+            end_time, 
+            duplicate_remover, 
+            file_processor
+        )
         
-        # Process events from CSV
-        events = file_processor.read_events_from_csv(csv_file)
-        
-        # Delete duplicates
-        success = duplicate_remover.remove_duplicates(session, events, metadata)
-        
-        # Mark as processed if successful
-        if success:
-            file_processor.mark_as_processed(csv_file)
-        
-        return success
+        return True
     except Exception as e:
-        logger.error(f"Error processing file {csv_file}: {str(e)}")
+        duplicate_finder.logger.error(f"Error processing time window {start_time} to {end_time}: {str(e)}")
         return False
 
 if __name__ == "__main__":
