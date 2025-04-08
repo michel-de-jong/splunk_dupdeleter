@@ -15,7 +15,7 @@ The following settings are tweakable via the config.ini file:
     - Defaults to 5000
 - TTL 
     - The value is used for both the find and delete searches
-    - Defaults to 20 seconds (to prevent hitting quota limits as much as possible)
+    - Defaults to 180 seconds (to prevent hitting quota limits as much as possible)
 <br/><br/>
 - Syntax: python3 splunk_duplicate_remover.py
 - Optional: -h (help)
