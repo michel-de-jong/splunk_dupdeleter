@@ -9,7 +9,7 @@ batch_size = 5000   ## For better performance, separate into smaller batches of 
 url = https://your-splunk-cloud-instance.splunkcloud.com
 jwt_token = your_jwt_token_here
 verify_ssl = True
-ttl = 20            ## Job time-to-live in seconds
+ttl = 180            ## Job time-to-live in seconds
 
 [search]
 index = your_index_name
