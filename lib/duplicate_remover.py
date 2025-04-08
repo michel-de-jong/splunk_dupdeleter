@@ -118,7 +118,7 @@ class DuplicateRemover:
                     'search': delete_query,
                     'output_mode': 'json',
                     'exec_mode': 'normal',
-                    'ttl': '300'  # Set TTL to 5 minutes (300 seconds)
+                    'ttl': '60'  # Set TTL to 1 minutes (60 seconds)
                 }
                 
                 response = session.post(url, data=payload)

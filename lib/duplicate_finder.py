@@ -98,7 +98,7 @@ class DuplicateFinder:
                 'search': search_query,
                 'output_mode': 'json',
                 'exec_mode': 'normal',
-                'ttl': '120'  # Set TTL to 2 minute (120 seconds)
+                'ttl': '60'  # Set TTL to 1 minute (60 seconds)
             }
             
             response = session.post(url, data=payload)
