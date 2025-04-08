@@ -62,20 +62,34 @@ class FileProcessor:
         try:
             filename = os.path.basename(csv_file)
             parts = filename.split('_')
-            if len(parts) >= 6:  # Now checking for at least 6 parts (including iteration)
-                iteration_part = parts[5].split('.')[0]  # Get iteration part (strip .csv)
-                # Extract iteration number if it exists
+            
+            # Find the position of 'iter' part to determine where the index name ends
+            iter_position = -1
+            for i, part in enumerate(parts):
+                if part.startswith('iter') or part.endswith('.csv'):
+                    iter_position = i
+                    break
+            
+            if iter_position >= 3:  # Need at least: [index_parts..., epoch1, epoch2, iter]
+                # Everything before the last 3 parts is the index
+                index_parts = parts[:(iter_position - 2)]
+                index = '_'.join(index_parts)
+                
+                # Get epoch timestamps (always 2nd and 3rd from last before iter)
+                earliest_epoch = int(parts[iter_position - 2])
+                latest_epoch = int(parts[iter_position - 1])
+                
+                # Extract iteration number
+                iteration_part = parts[iter_position].split('.')[0]  # Strip .csv if present
                 if iteration_part.startswith('iter'):
                     iteration = int(iteration_part[4:])  # Get number after 'iter'
                 else:
                     iteration = 1  # Default to 1 if no iteration found
                 
                 return {
-                    'index': parts[0],
-                    'start_time': parts[1],
-                    'end_time': parts[2],
-                    'earliest_epoch': int(parts[3]),
-                    'latest_epoch': int(parts[4]),
+                    'index': index,
+                    'earliest_epoch': earliest_epoch,
+                    'latest_epoch': latest_epoch,
                     'iteration': iteration
                 }
             else:

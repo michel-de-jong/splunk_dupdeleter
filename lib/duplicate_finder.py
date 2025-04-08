@@ -98,7 +98,7 @@ class DuplicateFinder:
                 'search': search_query,
                 'output_mode': 'json',
                 'exec_mode': 'normal',
-                'ttl': '300'  # Set TTL to 5 minutes (300 seconds)
+                'ttl': '120'  # Set TTL to 2 minute (120 seconds)
             }
             
             response = session.post(url, data=payload)
@@ -185,7 +185,7 @@ class DuplicateFinder:
                 response.raise_for_status()
                 
                 # Create CSV filename with index, timespan info and iteration number
-                file_name = f"{index}_{earliest.strftime('%Y%m%d%H%M')}_{latest.strftime('%Y%m%d%H%M')}_{earliest_epoch}_{latest_epoch}_iter{iteration}.csv"
+                file_name = f"{index}_{earliest_epoch}_{latest_epoch}_iter{iteration}.csv"
                 file_path = os.path.join(self.csv_dir, file_name)
                 
                 self.logger.debug(f"Attempting to write results to: {file_path}")

@@ -89,21 +89,25 @@ class DuplicateRemover:
                 start_idx = batch_num * batch_size
                 end_idx = min(start_idx + batch_size, len(event_ids))
                 
-                # Get current batch of CDs - we use these directly as they're the most efficient way to identify events
+                # Get current batch of both eventIDs and CDs
+                batch_event_ids = event_ids[start_idx:end_idx]
                 batch_cds = cds[start_idx:end_idx]
                 
-                # Build combined conditions for batch using only CD values
+                # Build combined conditions for batch using both eventID and cd pairs
                 pair_conditions = []
                 for i in range(len(batch_cds)):
-                    pair_conditions.append(f'(_cd="{batch_cds[i]}")')
+                    pair_conditions.append(f'(eventID="{batch_event_ids[i]}" AND cd="{batch_cds[i]}")')
                 
                 # Join the pair conditions with OR
                 search_condition = ' OR '.join(pair_conditions)
                 
-                # Construct the delete query using _cd directly and proper epoch format
+                # Construct the delete query using both eventID and cd
                 delete_query = f"""
-                search index={index} earliest={earliest} latest={latest} ({search_condition})
+                search index={index} earliest={earliest} latest={latest} 
+                | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
+                | search ({search_condition})
                 | delete
+                | where deleted>0
                 """
                 
                 self.logger.info(f"Deleting batch {batch_num+1}/{total_batches} with {len(batch_cds)} events")
