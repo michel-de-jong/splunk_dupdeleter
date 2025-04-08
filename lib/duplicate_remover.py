@@ -79,15 +79,19 @@ class DuplicateRemover:
             bool: True if deletion was successful, False otherwise
         """
         try:
-            # Build OR conditions for eventIDs and CDs
-            event_id_conditions = ' OR '.join([f'eventID="{event_id}"' for event_id in event_ids])
-            cd_conditions = ' OR '.join([f'cd="{cd}"' for cd in cds])
+            # Build combined conditions for each eventID and CD pair
+            pair_conditions = []
+            for i in range(len(event_ids)):
+                pair_conditions.append(f'(eventID="{event_ids[i]}" AND cd="{cds[i]}")')
             
-            # Construct the delete query with all conditions
+            # Join the pair conditions with OR
+            search_condition = ' OR '.join(pair_conditions)
+            
+            # Construct the delete query with the combined conditions
             delete_query = f"""
             search index={index} earliest={earliest} latest={latest}
             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-            | search ({event_id_conditions}) ({cd_conditions})
+            | search {search_condition}
             | delete
             """
             

@@ -62,13 +62,21 @@ class FileProcessor:
         try:
             filename = os.path.basename(csv_file)
             parts = filename.split('_')
-            if len(parts) >= 5:
+            if len(parts) >= 6:  # Now checking for at least 6 parts (including iteration)
+                iteration_part = parts[5].split('.')[0]  # Get iteration part (strip .csv)
+                # Extract iteration number if it exists
+                if iteration_part.startswith('iter'):
+                    iteration = int(iteration_part[4:])  # Get number after 'iter'
+                else:
+                    iteration = 1  # Default to 1 if no iteration found
+                
                 return {
                     'index': parts[0],
                     'start_time': parts[1],
                     'end_time': parts[2],
                     'earliest_epoch': int(parts[3]),
-                    'latest_epoch': int(parts[4].split('.')[0])  # Remove .csv extension
+                    'latest_epoch': int(parts[4]),
+                    'iteration': iteration
                 }
             else:
                 self.logger.error(f"Invalid CSV filename format: {filename}")

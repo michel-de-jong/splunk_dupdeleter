@@ -40,7 +40,7 @@ class StatsTracker:
     def initialize_display(self):
         """Initialize the stats display area"""
         if not self.display_initialized:
-            print("=== Splunk Duplicate Remover Statistics ===")
+            # print("=== Splunk Duplicate Remover Statistics ===")
             self.display_initialized = True
             self.update_search_display()
             self.update_delete_display()
@@ -52,8 +52,8 @@ class StatsTracker:
                 self.initialize_display()
             
             # Print all stats on the same line with carriage return
-            print(f"\rSearch API Calls: Success: {self.stats['search_api_calls']['success']} | Failures: {self.stats['search_api_calls']['failure']}")
-            #sys.stdout.flush()
+            # print(f"\rSearch API Calls: Success: {self.stats['search_api_calls']['success']} | Failures: {self.stats['search_api_calls']['failure']}")
+            # sys.stdout.flush()
         except Exception:
             # Fallback to non-dynamic display if terminal doesn't support ANSI codes
             pass
@@ -65,8 +65,8 @@ class StatsTracker:
                 self.initialize_display()
             
             # Print all stats on the same line with carriage return
-            print(f"\rDelete API Calls: Success: {self.stats['delete_api_calls']['success']} | Failures: {self.stats['delete_api_calls']['failure']}")
-            #sys.stdout.flush()
+            # print(f"\rDelete API Calls: Success: {self.stats['delete_api_calls']['success']} | Failures: {self.stats['delete_api_calls']['failure']}")
+            # sys.stdout.flush()
         except Exception:
             # Fallback to non-dynamic display if terminal doesn't support ANSI codes
             pass

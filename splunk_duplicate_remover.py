@@ -96,14 +96,15 @@ def run_parallelized_process(duplicate_finder, duplicate_remover, file_processor
 def process_time_window(duplicate_finder, duplicate_remover, file_processor, session, index, start_time, end_time):
     """Process a single time window to find and delete duplicates"""
     try:
-        # Find duplicates for this time window
+        # Find duplicates for this time window with initial iteration=1
         csv_file = duplicate_finder.find_duplicates_integrated(
             session, 
             index, 
             start_time, 
             end_time, 
             duplicate_remover, 
-            file_processor
+            file_processor,
+            iteration=1  # Explicitly start with iteration 1
         )
         
         return True
