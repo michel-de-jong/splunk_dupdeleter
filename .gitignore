@@ -2,6 +2,7 @@
 configs/config.ini
 csv_output/
 processed_csv/
+log/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -152,7 +152,7 @@ class DuplicateRemover:
                                 )
                                 results_response.raise_for_status()
                                 results_json = results_response.json()
-                                deleted_count = len(results_json.get('results', []))
+                                deleted_count = sum(int(result.get('deleted', 0)) for result in results_json.get('results', []))
                                 self.logger.info(f"Batch {batch_num+1}: Deleted {deleted_count} events")
                             except Exception as res_e:
                                 self.logger.warning(f"Couldn't get deletion results: {str(res_e)}")
