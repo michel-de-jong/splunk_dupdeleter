@@ -38,36 +38,21 @@ class DuplicateRemover:
             self.logger.info("No events to process")
             return True
         
-        # Group events by eventID
-        event_groups = {}
-        for event in events:
-            if 'eventID' in event and 'cd' in event:
-                event_id = event['eventID']
-                if event_id not in event_groups:
-                    event_groups[event_id] = []
-                event_groups[event_id].append(event)
-        
-        # Build lists for eventIDs and CDs to be used in bulk deletion
-        # Keep the first event of each eventID group, delete the rest
+        # Extract eventIDs and CDs directly from events
         event_ids_to_delete = []
         cds_to_delete = []
         
-        for event_id, events in event_groups.items():
-            if len(events) <= 1:
-                continue  # Skip if not actually a duplicate
-                
-            # Skip the first event (keep it), add the rest to delete list
-            for i, event in enumerate(events):
-                if i == 0:
-                    continue  # Keep the first one
-                    
-                event_ids_to_delete.append(event_id)
+        for event in events:
+            if 'eventID' in event and 'cd' in event:
+                event_ids_to_delete.append(event['eventID'])
                 cds_to_delete.append(event['cd'])
         
         if not event_ids_to_delete:
-            self.logger.info("No duplicate events to delete after filtering")
+            self.logger.info("No events found with required fields")
             return True
-            
+        
+        self.logger.info(f"Processing {len(event_ids_to_delete)} duplicate events")
+        
         # Execute bulk deletion
         return self.delete_duplicate_events_bulk(
             session=session,
