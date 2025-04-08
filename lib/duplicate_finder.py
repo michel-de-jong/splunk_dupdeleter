@@ -3,6 +3,9 @@ Module for finding duplicate events in Splunk
 """
 
 from datetime import datetime, timedelta
+import os
+import time
+import csv
 
 class DuplicateFinder:
     """
@@ -66,17 +69,22 @@ class DuplicateFinder:
             str: Path to final CSV file or None if no duplicates found
         """
         try:
+            # Convert to epoch timestamps for Splunk query
             earliest_epoch = int(earliest.timestamp())
             latest_epoch = int(latest.timestamp())
+            
+            # Format times in Splunk format for the API call
+            earliest_time = f"{earliest_epoch}"  # Epoch format for Splunk
+            latest_time = f"{latest_epoch}"      # Epoch format for Splunk
             
             self.logger.info(f"Starting integrated find/remove for timespan {earliest} to {latest} (iteration {iteration})")
             
             # Modified search query to ensure _cd is correctly captured
             search_query = f"""
-            search index={index} earliest={earliest_epoch} latest={latest_epoch}
+            search index={index} earliest={earliest_time} latest={latest_time}
             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
             | search 
-                [| search index={index} earliest={earliest_epoch} latest={latest_epoch}
+                [| search index={index} earliest={earliest_time} latest={latest_time}
                 | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
                 | stats first(_cd) as cd count by eventID
                 | search count>1 
@@ -89,7 +97,8 @@ class DuplicateFinder:
             payload = {
                 'search': search_query,
                 'output_mode': 'json',
-                'exec_mode': 'normal'
+                'exec_mode': 'normal',
+                'ttl': '300'  # Set TTL to 5 minutes (300 seconds)
             }
             
             response = session.post(url, data=payload)
@@ -139,77 +148,6 @@ class DuplicateFinder:
             self.logger.error(f"Error in integrated find/remove: {str(e)}")
             self.stats_tracker.increment_search_failure()
             return None
-            
-    # def find_duplicates(self, session, index, earliest, latest, iteration=1):
-    #     """Original find_duplicates method - kept for compatibility"""
-    #     try:
-    #         earliest_epoch = int(earliest.timestamp())
-    #         latest_epoch = int(latest.timestamp())
-            
-    #         # Create unique lookup name for this time window including iteration
-    #         base_lookup_name = f"duplicate_events_{earliest_epoch}_{latest_epoch}"
-    #         lookup_names = []  # Keep track of all lookup names for this window
-    #         current_lookup_name = f"{base_lookup_name}_part{iteration}"
-            
-    #         # For NOT clause, we need to combine all previous lookups
-    #         if iteration > 1:
-    #             lookup_names = [f"{base_lookup_name}_part{i}" for i in range(1, iteration)]
-    #             not_clauses = [f"[| inputlookup {name}]" for name in lookup_names]
-    #             not_clause = f"NOT ({' OR '.join(not_clauses)})"
-    #         else:
-    #             not_clause = ""
-            
-    #         # Base search that finds duplicates
-    #         search_query = f"""
-    #         search index={index} earliest={earliest_epoch} latest={latest_epoch} {not_clause}
-    #         | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-    #         | search 
-    #             [| search index={index} earliest={earliest_epoch} latest={latest_epoch}
-    #             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
-    #             | stats first(cd) as cd count by eventID
-    #             | search count>1 
-    #             | table cd eventID]
-    #         | table index eventID cd
-    #         """
-            
-    #         # Run search and get results first
-    #         url = f"{self.config['splunk']['url']}/services/search/jobs"
-    #         payload = {
-    #             'search': search_query,
-    #             'output_mode': 'json',
-    #             'exec_mode': 'normal'
-    #         }
-            
-    #         response = session.post(url, data=payload)
-    #         response.raise_for_status()
-    #         job_id = response.json()['sid']
-            
-    #         self.logger.debug(f"Search job submitted: {job_id} for timespan {earliest} to {latest} (iteration {iteration})")
-            
-    #         # Wait for job completion and handle results
-    #         csv_filepath = self._wait_for_job_and_export_results(
-    #             session, job_id, index, earliest, latest, 
-    #             earliest_epoch, latest_epoch, iteration
-    #         )
-            
-    #         # If we hit the result limit, run another iteration
-    #         if csv_filepath and self._hit_result_limit(csv_filepath):
-    #             self.logger.info(f"Hit 10000 result limit, running additional search (iteration {iteration + 1})")
-    #             next_filepath = self.find_duplicates(session, index, earliest, latest, iteration + 1)
-                
-    #             # Cleanup all temporary lookups after last iteration
-    #             if not next_filepath:
-    #                 lookup_names.append(current_lookup_name)
-    #                 for name in lookup_names:
-    #                     self._cleanup_lookup(session, name)
-            
-    #         self.stats_tracker.increment_search_success()
-    #         return csv_filepath
-            
-    #     except Exception as e:
-    #         self.logger.error(f"Error submitting search: {str(e)}")
-    #         self.stats_tracker.increment_search_failure()
-    #         return None
 
     def _wait_for_job_and_export_results(self, session, job_id, index, earliest, latest, earliest_epoch, latest_epoch, iteration):
         """
@@ -223,7 +161,7 @@ class DuplicateFinder:
             status_url = f"{self.config['splunk']['url']}/services/search/jobs/{job_id}"
             
             while not is_done:
-                response = session.get(f"{status_url}", params={'output_mode': 'json'})
+                response = session.get(status_url, params={'output_mode': 'json'})
                 response.raise_for_status()
                 status = response.json()['entry'][0]['content']
                 
@@ -288,6 +226,5 @@ class DuplicateFinder:
 
     def _hit_result_limit(self, csv_filepath):
         """Check if we hit the 10000 result limit"""
-        import csv
         with open(csv_filepath, 'r') as f:
             return sum(1 for _ in csv.reader(f)) > 10000

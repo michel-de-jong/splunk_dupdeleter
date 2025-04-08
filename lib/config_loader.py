@@ -3,7 +3,6 @@ Configuration loader module for Splunk Duplicate Remover
 """
 
 import configparser
-import json
 import os
 
 class ConfigLoader:
@@ -30,23 +29,7 @@ class ConfigLoader:
         """
         if not os.path.exists(self.config_file):
             raise FileNotFoundError(f"Configuration file not found: {self.config_file}")
-        
-        if self.config_file.endswith('.json'):
-            return self._load_json()
-        else:  # Assume INI file
-            return self._load_ini()
-    
-    def _load_json(self):
-        """Load configuration from JSON file"""
-        with open(self.config_file, 'r') as f:
-            json_config = json.load(f)
-            
-            # Convert JSON to ConfigParser object for consistent interface
-            config = configparser.ConfigParser()
-            for section, values in json_config.items():
-                config[section] = values
-                
-            return config
+        return self._load_ini()
     
     def _load_ini(self):
         """Load configuration from INI file"""

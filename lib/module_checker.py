@@ -21,7 +21,6 @@ def check_modules():
         'concurrent.futures', # For parallelization of searches
         'argparse',           # For command-line arguments
         'tarfile',            # For compressing processed CSV files
-        'json',               # For JSON config parsing
         'csv',                # For CSV processing
         'datetime',           # For time window calculations
         'logging',            # For logging functionality
