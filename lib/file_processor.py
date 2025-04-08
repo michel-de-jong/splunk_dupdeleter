@@ -123,9 +123,9 @@ class FileProcessor:
                 self.logger.error(f"Could not extract metadata from filename: {csv_file}")
                 return False
 
-            # Create subdirectory based on start_time (YYYYMMDDHH format)
-            date_hour_subdir = metadata['start_time'][:10]  # Extract YYYYMMDDHH from timestamp
-            target_dir = os.path.join(self.processed_dir, date_hour_subdir)
+            # Create subdirectory based on epoch timestamp range
+            subdir_name = f"{metadata['earliest_epoch']}_{metadata['latest_epoch']}"
+            target_dir = os.path.join(self.processed_dir, subdir_name)
             
             # Create subdirectory if it doesn't exist
             if not os.path.exists(target_dir):
