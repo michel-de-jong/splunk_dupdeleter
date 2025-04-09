@@ -107,7 +107,8 @@ class DuplicateRemover:
                     'search': delete_query,
                     'output_mode': 'json',
                     'exec_mode': 'normal',
-                    'ttl': self.config['splunk'].get('ttl', '20')  # Get TTL from config, default to 20
+                    'adhoc_search_level': 'fast',
+                    'timeout': self.config['splunk'].get('ttl', '180')  # Get TTL from config, default to 180
                 }
                 
                 response = session.post(url, data=payload)

@@ -27,11 +27,27 @@ def main():
     """Main entry point for the application"""
     parser = argparse.ArgumentParser(description='Splunk Duplicate Event Finder and Remover')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    
+    # Add optional command-line arguments that override config.ini values
+    parser.add_argument('--max_workers', type=int, help='Maximum number of concurrent searches')
+    parser.add_argument('--batch_size', type=int, help='Batch size for processing events')
+    parser.add_argument('--url', help='Splunk Cloud URL')
+    parser.add_argument('--jwt_token', help='JWT token for Splunk authentication')
+    parser.add_argument('--start_time', help='Start time for search window (ISO format)')
+    parser.add_argument('--end_time', help='End time for search window (ISO format)')
+    parser.add_argument('--verify_ssl', type=lambda x: (str(x).lower() == 'true'), 
+                        help='Whether to verify SSL certificates (true/false)')
+    parser.add_argument('--index', help='Splunk index name to search')
+    
     args = parser.parse_args()
     
     try:
         # Load configuration from default path (configs/config.ini)
         config = ConfigLoader().load()
+        
+        # Override config with command-line arguments if provided
+        update_config_from_args(config, args)
+        
     except FileNotFoundError as e:
         print(f"Error: {str(e)}")
         print("Please ensure configs/config.ini exists and is properly configured.")
@@ -39,6 +55,16 @@ def main():
     
     # Setup logging
     logger = setup_logger(config, args.debug)
+    logger.info("Starting Splunk Duplicate Remover")
+    
+    # Log configuration settings
+    logger.debug(f"Configuration: max_workers={config['general'].get('max_workers')}, "
+                 f"batch_size={config['general'].get('batch_size')}, "
+                 f"url={config['splunk'].get('url')}, "
+                 f"verify_ssl={config['splunk'].get('verify_ssl')}, "
+                 f"index={config['search'].get('index')}, "
+                 f"start_time={config['search'].get('start_time')}, "
+                 f"end_time={config['search'].get('end_time')}")
     
     # Initialize components
     stats_tracker = StatsTracker()
@@ -74,9 +100,39 @@ def main():
     logger.info("Completed processing all time windows")
     return True
 
+def update_config_from_args(config, args):
+    """
+    Update configuration with command-line arguments
+    
+    Args:
+        config (configparser.ConfigParser): Configuration object
+        args (argparse.Namespace): Command-line arguments
+    """
+    # Update general section
+    if args.max_workers is not None:
+        config['general']['max_workers'] = str(args.max_workers)
+    if args.batch_size is not None:
+        config['general']['batch_size'] = str(args.batch_size)
+    
+    # Update splunk section
+    if args.url is not None:
+        config['splunk']['url'] = args.url
+    if args.jwt_token is not None:
+        config['splunk']['jwt_token'] = args.jwt_token
+    if args.verify_ssl is not None:
+        config['splunk']['verify_ssl'] = str(args.verify_ssl)
+    
+    # Update search section
+    if args.index is not None:
+        config['search']['index'] = args.index
+    if args.start_time is not None:
+        config['search']['start_time'] = args.start_time
+    if args.end_time is not None:
+        config['search']['end_time'] = args.end_time
+
 def run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger):
     """Run integrated search and delete process in parallel batches"""
-    max_workers = int(duplicate_finder.config['general'].get('max_workers', 6))  # Default to 6 if not configured
+    max_workers = int(duplicate_finder.config['general'].get('max_workers', 1))  # Default to 1 if not configured
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         for i in range(0, len(time_windows), max_workers):
