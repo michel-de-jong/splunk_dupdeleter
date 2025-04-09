@@ -3,6 +3,7 @@ Module for removing duplicate events from Splunk
 """
 
 import time
+import json
 
 class DuplicateRemover:
     """
@@ -110,10 +111,21 @@ class DuplicateRemover:
                     'adhoc_search_level': 'fast',
                     'timeout': self.config['splunk'].get('ttl', '180')  # Get TTL from config, default to 180
                 }
+
+                # Send job as JSON instead of form-encoded for better performance
+                headers = {
+                    'Content-Type': 'application/json'
+                }
                 
+                response = session.post(url, data=json.dumps(payload), headers=headers)
+                response.raise_for_status()
+                job_id = response.json()['sid']
+
+                '''
                 response = session.post(url, data=payload)
                 response.raise_for_status()
                 job_id = response.json()['sid']
+                '''
                 
                 self.logger.info(f"Bulk delete job submitted: {job_id}")
                 

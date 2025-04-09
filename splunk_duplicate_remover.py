@@ -152,7 +152,7 @@ def run_parallelized_process(duplicate_finder, duplicate_remover, file_processor
                     logger.error(f"Error in search execution: {str(e)}")
             
             # Sleep briefly between batches to avoid overwhelming Splunk
-            time.sleep(2)
+            time.sleep(5)
 
 def process_time_window(duplicate_finder, duplicate_remover, file_processor, session, index, start_time, end_time):
     """Process a single time window to find and delete duplicates"""
