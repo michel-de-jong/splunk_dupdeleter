@@ -1,5 +1,5 @@
 """
-Module for finding duplicate events in Splunk
+Module for finding duplicate events in Splunk with performance optimizations
 """
 
 from datetime import datetime, timedelta
@@ -9,7 +9,7 @@ import csv
 
 class DuplicateFinder:
     """
-    Handles finding duplicate events in Splunk
+    Handles finding duplicate events in Splunk with performance optimizations
     """
     
     def __init__(self, config, logger, stats_tracker):
@@ -79,152 +79,113 @@ class DuplicateFinder:
             
             self.logger.info(f"Starting integrated find/remove for timespan {earliest} to {latest} (iteration {iteration})")
             
-            # Modified search query to ensure _cd is correctly captured
+            # Optimized search query to ensure _cd is correctly captured
+            # Use subsearches and avoid extra steps when possible
             search_query = f"""
             search index={index} earliest={earliest_time} latest={latest_time}
+            | fields host source sourcetype _time _raw _cd
             | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
             | search 
                 [| search index={index} earliest={earliest_time} latest={latest_time}
-                | eval eventID=md5(host.source.sourcetype._time._raw), cd=_cd
+                | fields host source sourcetype _time _raw _cd
+                | eval eventID=md5(host.source.sourcetype._time._raw)
                 | stats first(_cd) as cd count by eventID
-                | search count>1 
-                | table eventID cd]
-            | table eventID cd
+                | where count>1 
+                | fields eventID cd]
+            | fields eventID cd
             """
             
-            # Run search and get results
-            url = f"{self.config['splunk']['url']}/services/search/jobs"
+            
+            # PERFORMANCE IMPROVEMENT: Use oneshot search with export directly instead of normal job creation
+            # This avoids the overhead of job creation, monitoring, and results fetching
+            url = f"{self.config['splunk']['url']}/services/search/jobs/export"
             payload = {
                 'search': search_query,
-                'output_mode': 'json',
-                'exec_mode': 'normal',
-                'ttl': self.config['splunk'].get('ttl', '20')  # Get TTL from config, default to 20
+                'output_mode': 'csv',
+                'earliest_time': earliest_time,
+                'latest_time': latest_time,
+                'adhoc_search_level': 'fast',
+                'timeout': self.config['splunk'].get('ttl', '180'),  # Get TTL from config, default to 180
+                'exec_mode': 'oneshot',      # Use oneshot mode for faster execution
             }
             
-            response = session.post(url, data=payload)
-            response.raise_for_status()
-            job_id = response.json()['sid']
+            self.logger.debug(f"Executing oneshot search for timespan {earliest} to {latest} (iteration {iteration})")
             
-            self.logger.debug(f"Search job submitted: {job_id} for timespan {earliest} to {latest} (iteration {iteration})")
-            
-            # Wait for job completion and handle results
-            csv_filepath = self._wait_for_job_and_export_results(
-                session, job_id, index, earliest, latest, 
-                earliest_epoch, latest_epoch, iteration
+            # Execute the search with optimized connection settings
+            response = session.post(
+                url, 
+                data=payload,
+                stream=True   # Stream the response to handle large result sets
             )
+            response.raise_for_status()
             
-            if csv_filepath:
-                self.logger.info(f"Found duplicates in timespan {earliest} to {latest} (iteration {iteration}), processing now")
+            # Create CSV filename with index, timespan info and iteration number
+            file_name = f"{index}_{earliest_epoch}_{latest_epoch}_iter{iteration}.csv"
+            file_path = os.path.join(self.csv_dir, file_name)
+            
+            # Check if directory exists
+            if not os.path.exists(self.csv_dir):
+                os.makedirs(self.csv_dir)
                 
-                # Check if we hit the result limit BEFORE processing
-                hit_limit = self._hit_result_limit(csv_filepath)
+            # Process the response directly to a file
+            with open(file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            # Check if we got any results
+            with open(file_path, 'r') as f:
+                # Read first line (header)
+                header = f.readline().strip()
+                # Read second line to see if we have any results
+                first_data = f.readline().strip()
                 
-                # Process and remove duplicates
-                metadata = file_processor.extract_metadata_from_filename(csv_filepath)
-                if not metadata:
+                if not first_data:
+                    # No results found
+                    os.remove(file_path)  # Clean up empty file
+                    self.logger.info(f"No duplicate events found in timespan {earliest} to {latest} (iteration {iteration})")
                     return None
+            
+            self.logger.info(f"Found duplicates in timespan {earliest} to {latest} (iteration {iteration}), processing now")
+            
+            # Check if we hit the result limit
+            hit_limit = self._hit_result_limit(file_path)
+            
+            # Process and remove duplicates
+            metadata = file_processor.extract_metadata_from_filename(file_path)
+            if not metadata:
+                return None
+            
+            events = file_processor.read_events_from_csv(file_path)
+            success = duplicate_remover.remove_duplicates(session, events, metadata)
+            
+            if success:
+                file_processor.mark_as_processed(file_path)
                 
-                events = file_processor.read_events_from_csv(csv_filepath)
-                success = duplicate_remover.remove_duplicates(session, events, metadata)
-                
-                if success:
-                    file_processor.mark_as_processed(csv_filepath)
-                    
-                    # If we hit the limit, start next iteration
-                    if hit_limit:
-                        self.logger.info(f"Hit 10000 result limit, running additional search for same timespan (iteration {iteration + 1})")
-                        return self.find_duplicates_integrated(
-                            session, index, earliest, latest, duplicate_remover, file_processor, iteration + 1
-                        )
-                else:
-                    self.logger.warning(f"Failed to remove duplicates for {csv_filepath}")
+                # If we hit the limit, start next iteration
+                if hit_limit:
+                    self.logger.info(f"Hit result limit, running additional search for same timespan (iteration {iteration + 1})")
+                    return self.find_duplicates_integrated(
+                        session, index, earliest, latest, duplicate_remover, file_processor, iteration + 1
+                    )
             else:
-                self.logger.info(f"No duplicate events found in timespan {earliest} to {latest} (iteration {iteration})")
+                self.logger.warning(f"Failed to remove duplicates for {file_path}")
             
             self.stats_tracker.increment_search_success()
-            return csv_filepath
+            return file_path
             
         except Exception as e:
             self.logger.error(f"Error in integrated find/remove: {str(e)}")
             self.stats_tracker.increment_search_failure()
             return None
 
-    def _wait_for_job_and_export_results(self, session, job_id, index, earliest, latest, earliest_epoch, latest_epoch, iteration):
-        """
-        Wait for a search job to complete and export results to CSV
-        """
-        import os
-        import time
-        
-        try:
-            is_done = False
-            status_url = f"{self.config['splunk']['url']}/services/search/jobs/{job_id}"
-            
-            while not is_done:
-                response = session.get(status_url, params={'output_mode': 'json'})
-                response.raise_for_status()
-                status = response.json()['entry'][0]['content']
-                
-                if status['isDone']:
-                    is_done = True
-                else:
-                    progress = round(float(status['doneProgress']) * 100, 2)
-                    self.logger.debug(f"Job {job_id} in progress: {progress}%")
-                    time.sleep(5)
-            
-            # Once job is done, get results
-            if int(status['resultCount']) > 0:
-                results_url = f"{self.config['splunk']['url']}/services/search/jobs/{job_id}/results"
-                response = session.get(
-                    results_url,
-                    params={
-                        'output_mode': 'csv',
-                        'count': 0  # get all results
-                    }
-                )
-                response.raise_for_status()
-                
-                # Create CSV filename with index, timespan info and iteration number
-                file_name = f"{index}_{earliest_epoch}_{latest_epoch}_iter{iteration}.csv"
-                file_path = os.path.join(self.csv_dir, file_name)
-                
-                self.logger.debug(f"Attempting to write results to: {file_path}")
-                
-                # Verify directory exists and is writable
-                if not os.path.exists(self.csv_dir):
-                    self.logger.error(f"CSV directory does not exist: {self.csv_dir}")
-                    return None
-                    
-                if not os.access(self.csv_dir, os.W_OK):
-                    self.logger.error(f"CSV directory is not writable: {self.csv_dir}")
-                    return None
-                
-                # Save results to CSV with error handling
-                try:
-                    with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
-                        csvfile.write(response.text)
-                    
-                    # Verify file was created
-                    if os.path.exists(file_path):
-                        self.logger.info(f"Successfully saved {status['resultCount']} duplicate events to {file_path}")
-                        return file_path
-                    else:
-                        self.logger.error(f"Failed to create file: {file_path}")
-                        return None
-                        
-                except IOError as e:
-                    self.logger.error(f"IOError while writing CSV file {file_path}: {str(e)}")
-                    return None
-                    
-            else:
-                self.logger.info(f"No duplicate events found in timespan {earliest} to {latest}")
-                return None
-                
-        except Exception as e:
-            self.logger.error(f"Error in _wait_for_job_and_export_results: {str(e)}")
-            return None
-
     def _hit_result_limit(self, csv_filepath):
-        """Check if we hit the 10000 result limit"""
-        with open(csv_filepath, 'r') as f:
-            return sum(1 for _ in csv.reader(f)) > 10000
+        """Check if we hit the results limit"""
+        try:
+            with open(csv_filepath, 'r') as f:
+                row_count = sum(1 for _ in csv.reader(f))
+                # Subtract 1 for header row
+                return (row_count - 1) >= int(self.config['general'].get('batch_size', 5000))
+        except Exception as e:
+            self.logger.error(f"Error checking result limit: {str(e)}")
+            return False

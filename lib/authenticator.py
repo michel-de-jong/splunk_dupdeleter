@@ -1,5 +1,5 @@
 """
-Splunk authentication module
+Splunk authentication module with performance optimizations
 """
 
 import requests
@@ -10,7 +10,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class SplunkAuthenticator:
     """
-    Handles authentication to Splunk Cloud instance
+    Handles authentication to Splunk Cloud instance with performance optimizations
     """
     
     def __init__(self, config, logger):
@@ -32,8 +32,20 @@ class SplunkAuthenticator:
             requests.Session: Authenticated session or None if failed
         """
         try:
-            # Create a new session
+            # PERFORMANCE IMPROVEMENT: Configure the requests session for better performance
             session = requests.Session()
+            
+            # Configure connection pooling
+            adapter = requests.adapters.HTTPAdapter(
+                pool_connections=10,  # Number of connection pools to cache
+                pool_maxsize=20,      # Number of connections to save in the pool
+                max_retries=3,        # Retry failed requests
+                pool_block=False      # Don't block when pool is depleted
+            )
+            
+            # Add the adapter to both HTTP and HTTPS 
+            session.mount('http://', adapter)
+            session.mount('https://', adapter)
             
             # Get JWT token from config
             jwt_token = self.config['splunk']['jwt_token']
@@ -41,7 +53,9 @@ class SplunkAuthenticator:
             # Set authorization header with JWT token
             session.headers.update({
                 'Authorization': f'Bearer {jwt_token}',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Connection': 'keep-alive',         # Keep connection alive for better performance
+                'Accept-Encoding': 'gzip, deflate'  # Accept compressed responses
             })
             
             # Set SSL verification based on config
@@ -55,8 +69,10 @@ class SplunkAuthenticator:
                 data={
                     'search': 'search index=_internal | head 1',
                     'output_mode': 'json',
-                    'earliest_time': '-1m'
-                    },
+                    'earliest_time': '-1m',
+                    'exec_mode': 'oneshot'  # Use oneshot for quick authentication test
+                },
+                timeout=30  # Set a reasonable timeout
             )
             response.raise_for_status()
             
