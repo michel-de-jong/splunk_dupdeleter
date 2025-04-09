@@ -23,14 +23,20 @@ class SplunkAuthenticator:
         """
         self.config = config
         self.logger = logger
+        self.session = None  # Store the authenticated session
     
     def authenticate(self):
         """
         Authenticate to Splunk Cloud using JWT token
+        Only performs the authentication test once and stores the session
         
         Returns:
             requests.Session: Authenticated session or None if failed
         """
+        if self.session is not None:
+            # Return the existing authenticated session if we already have one
+            return self.session
+            
         try:
             # PERFORMANCE IMPROVEMENT: Configure the requests session for better performance
             session = requests.Session()
@@ -77,7 +83,11 @@ class SplunkAuthenticator:
             response.raise_for_status()
             
             self.logger.info("Successfully authenticated to Splunk Cloud using JWT token")
+            
+            # Store the authenticated session for future use
+            self.session = session
             return session
         except Exception as e:
             self.logger.error(f"Authentication failed: {str(e)}")
+            self.session = None
             return None
