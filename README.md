@@ -41,12 +41,12 @@ python3 splunk_duplicate_remover.py
 | `--debug` | Enable debug logging |
 | `--max_workers <MAX_WORKERS>` | Maximum number of concurrent searches |
 | `--batch_size <BATCH_SIZE>` | Batch size for processing events |
-| `--url URL` | Splunk Cloud URL |
+| `--url <URL>` | Splunk Cloud URL |
 | `--jwt_token <JWT_TOKEN>` | JWT token for Splunk authentication |
 | `--start_time <START_TIME>` | Start time for search window (ISO format) |
 | `--end_time <END_TIME>` | End time for search window (ISO format) |
 | `--verify_ssl <VERIFY_SSL>` | Whether to verify SSL certificates (true/false) |
 | `--index <INDEX>` | Splunk index name to search |
-| `--ttl` | Time-to-live value for completed Splunk searches (seconds) |
+| `--ttl <TTL>` | Time-to-live value for completed Splunk searches (seconds) |
 | `--compression_threshold_mb <COMPRESSION_THRESHOLD_MB>` | Size threshold in MB for compressing directories |
 | `--max_storage_mb <MAX_STORAGE_MB>` | Maximum storage size in MB before cleanup |
