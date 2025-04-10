@@ -33,10 +33,14 @@ class FileProcessor:
         """
         Create required directories if they don't exist
         """
+        self.logger.debug(f"Ensuring directories exist: {self.csv_dir}, {self.processed_dir}")
         for directory in [self.csv_dir, self.processed_dir]:
             if not os.path.exists(directory):
+                self.logger.debug(f"Creating directory: {directory}")
                 os.makedirs(directory)
                 self.logger.info(f"Created directory: {directory}")
+            else:
+                self.logger.debug(f"Directory already exists: {directory}")
     
     def get_unprocessed_csv_files(self):
         """
@@ -45,11 +49,15 @@ class FileProcessor:
         Returns:
             list: List of paths to unprocessed CSV files
         """
+        self.logger.debug(f"Getting unprocessed CSV files from {self.csv_dir}")
         if not os.path.exists(self.csv_dir):
+            self.logger.debug(f"CSV directory does not exist: {self.csv_dir}")
             return []
         
-        return [os.path.join(self.csv_dir, f) for f in os.listdir(self.csv_dir) 
+        files = [os.path.join(self.csv_dir, f) for f in os.listdir(self.csv_dir) 
                 if f.endswith('.csv')]
+        self.logger.debug(f"Found {len(files)} unprocessed CSV files")
+        return files
     
     def extract_metadata_from_filename(self, csv_file):
         """

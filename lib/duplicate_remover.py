@@ -34,6 +34,9 @@ class DuplicateRemover:
         Returns:
             bool: True if all duplicates were deleted, False otherwise
         """
+        self.logger.debug(f"Starting remove_duplicates with {len(events) if events else 0} events")
+        self.logger.debug(f"Metadata: index={metadata.get('index')}, earliest={metadata.get('earliest_epoch')}, latest={metadata.get('latest_epoch')}")
+        
         if not events:
             self.logger.info("No events to process")
             return True
@@ -49,12 +52,14 @@ class DuplicateRemover:
         
         if not event_ids_to_delete:
             self.logger.info("No events found with required fields")
+            self.logger.debug("Missing eventID or cd fields in all events")
             return True
         
         self.logger.info(f"Processing {len(event_ids_to_delete)} duplicate events")
+        self.logger.debug(f"First eventID: {event_ids_to_delete[0] if event_ids_to_delete else 'None'}, first cd: {cds_to_delete[0] if cds_to_delete else 'None'}")
         
         # Execute bulk deletion
-        return self.delete_duplicate_events_bulk(
+        result = self.delete_duplicate_events_bulk(
             session=session,
             index=metadata['index'],
             event_ids=event_ids_to_delete,
@@ -62,6 +67,9 @@ class DuplicateRemover:
             earliest=metadata['earliest_epoch'],
             latest=metadata['latest_epoch']
         )
+        
+        self.logger.debug(f"delete_duplicate_events_bulk result: {result}")
+        return result
 
     def delete_duplicate_events_bulk(self, session, index, event_ids, cds, earliest, latest):
         """
