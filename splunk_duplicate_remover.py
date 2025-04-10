@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--verify_ssl', type=lambda x: (str(x).lower() == 'true'), 
                         help='Whether to verify SSL certificates (true/false)')
     parser.add_argument('--index', help='Splunk index name to search')
+    parser.add_argument('--ttl', type=int, help='Time-to-live value for Splunk searches in seconds')
     
     args = parser.parse_args()
     
@@ -121,6 +122,8 @@ def update_config_from_args(config, args):
         config['splunk']['jwt_token'] = args.jwt_token
     if args.verify_ssl is not None:
         config['splunk']['verify_ssl'] = str(args.verify_ssl)
+    if args.ttl is not None:
+        config['splunk']['ttl'] = str(args.ttl)
     
     # Update search section
     if args.index is not None:
