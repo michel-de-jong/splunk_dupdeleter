@@ -217,7 +217,7 @@ class DuplicateFinder:
                     return None
                     
             else:
-                self.logger.info(f"No duplicate events found in timespan {earliest} to {latest}")
+                # self.logger.info(f"No duplicate events found in timespan {earliest} to {latest}")
                 return None
                 
         except Exception as e:
