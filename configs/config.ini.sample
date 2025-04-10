@@ -8,7 +8,7 @@ log_file = splunk_duplicate_remover.log
 [splunk]
 url = https://your-splunk-instance.splunkcloud.com
 jwt_token = your_jwt_token_here
-verify_ssl = False
+verify_ssl = True
 ttl = 180
 
 [search]
