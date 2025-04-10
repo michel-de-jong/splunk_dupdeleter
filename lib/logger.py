@@ -7,6 +7,18 @@ from logging.handlers import RotatingFileHandler
 import os
 import datetime
 
+class MessageTruncatingFilter(logging.Filter):
+    """Filter that truncates long log messages"""
+    
+    def __init__(self, max_length=750):
+        super().__init__()
+        self.max_length = max_length
+        
+    def filter(self, record):
+        if len(record.msg) > self.max_length:
+            record.msg = record.msg[:self.max_length] + f"... (truncated, full length: {len(record.msg)} chars)"
+        return True
+
 def setup_logger(config, debug=False):
     """
     Configure and return a logger with rotation and compression
@@ -86,7 +98,12 @@ def setup_logger(config, debug=False):
         # Add debug handler to logger
         logger.addHandler(debug_handler)
         
+        # Only apply message truncation filter in debug mode
+        truncate_filter = MessageTruncatingFilter(max_length=500)
+        logger.addFilter(truncate_filter)
+        
         logger.debug(f"Debug logging enabled to {debug_log_path}")
+        logger.debug(f"Long message truncation enabled (max 500 chars)")
     
     # Log initial message with file size info
     if os.path.exists(log_path):
