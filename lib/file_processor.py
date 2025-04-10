@@ -11,18 +11,20 @@ class FileProcessor:
     Handles CSV file operations
     """
     
-    def __init__(self, config, logger):
+    def __init__(self, config, logger, storage_manager=None):
         """
         Initialize with configuration and logger
         
         Args:
             config (configparser.ConfigParser): Configuration
             logger (logging.Logger): Logger instance
+            storage_manager (StorageManager, optional): Storage manager instance
         """
         self.config = config
         self.logger = logger
         self.csv_dir = config.get('general', 'csv_dir', fallback='csv_output')
         self.processed_dir = config.get('general', 'processed_dir', fallback='processed_csv')
+        self.storage_manager = storage_manager
         
         # Create directories if they don't exist
         self._ensure_directories_exist()
@@ -157,6 +159,12 @@ class FileProcessor:
             # Remove original CSV file
             os.remove(csv_file)
             self.logger.info(f"Marked CSV as processed: {csv_file} -> {tar_path}")
+            
+            # Check storage after processing a file if storage_manager is provided
+            if self.storage_manager is not None:
+                self.logger.debug("Running storage maintenance check")
+                self.storage_manager.check_storage()
+            
             return True
         except Exception as e:
             self.logger.error(f"Error marking CSV as processed: {str(e)}")

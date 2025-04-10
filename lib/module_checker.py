@@ -26,7 +26,8 @@ def check_modules():
         'logging',            # For logging functionality
         'os',                 # For file operations
         'sys',                # For system interactions
-        'time'                # For sleep and timing functions
+        'time',               # For sleep and timing functions
+        'shutil'              # For directory operations
     ]
     
     missing_modules = []

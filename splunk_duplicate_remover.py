@@ -19,6 +19,7 @@ from lib.duplicate_finder import DuplicateFinder
 from lib.duplicate_remover import DuplicateRemover
 from lib.file_processor import FileProcessor
 from lib.stats_tracker import StatsTracker
+from lib.storage_manager import StorageManager
 
 __name__ = "splunk_duplicate_remover.py"
 __author__ = "Michel de Jong"
@@ -40,6 +41,12 @@ def main():
     parser.add_argument('--index', help='Splunk index name to search')
     parser.add_argument('--ttl', type=int, help='Time-to-live value for Splunk searches in seconds')
     
+    # Add storage management arguments
+    parser.add_argument('--compression_threshold_mb', type=float, 
+                        help='Size threshold in MB for compressing directories')
+    parser.add_argument('--max_storage_mb', type=float, 
+                        help='Maximum storage size in MB before cleanup')
+    
     args = parser.parse_args()
     
     try:
@@ -48,6 +55,13 @@ def main():
         
         # Override config with command-line arguments if provided
         update_config_from_args(config, args)
+        
+        # Add the storage section if it doesn't exist
+        if 'storage' not in config:
+            config.add_section('storage')
+            config['storage']['compression_threshold_mb'] = '50'
+            config['storage']['max_storage_mb'] = '500'
+            config['storage']['log_file'] = 'storage_manager.log'
         
     except FileNotFoundError as e:
         print(f"Error: {str(e)}")
@@ -65,14 +79,21 @@ def main():
                  f"verify_ssl={config['splunk'].get('verify_ssl')}, "
                  f"index={config['search'].get('index')}, "
                  f"start_time={config['search'].get('start_time')}, "
-                 f"end_time={config['search'].get('end_time')}")
+                 f"end_time={config['search'].get('end_time')}, "
+                 f"compression_threshold_mb={config['storage'].get('compression_threshold_mb')}, "
+                 f"max_storage_mb={config['storage'].get('max_storage_mb')}")
     
     # Initialize components
     stats_tracker = StatsTracker()
     authenticator = SplunkAuthenticator(config, logger)
     duplicate_finder = DuplicateFinder(config, logger, stats_tracker)
     duplicate_remover = DuplicateRemover(config, logger, stats_tracker)
-    file_processor = FileProcessor(config, logger)
+    
+    # Initialize storage manager
+    storage_manager = StorageManager(config, logger)
+    
+    # Initialize file processor with storage manager
+    file_processor = FileProcessor(config, logger, storage_manager)
     
     # Create output directories if they don't exist
     csv_dir = config.get('general', 'csv_dir', fallback='csv_output')
@@ -94,9 +115,17 @@ def main():
     # Generate time windows for searches
     time_windows = duplicate_finder.generate_timespan_windows(start_time, end_time)
     
+    # Initial storage check
+    logger.info("Performing initial storage maintenance check")
+    storage_manager.check_storage()
+    
     # Run integrated process to find and remove duplicates in each time window
     logger.info(f"Starting integrated search and remove process for {len(time_windows)} time windows")
     run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger)
+    
+    # Final storage check
+    logger.info("Performing final storage maintenance check")
+    storage_manager.check_storage()
     
     logger.info("Completed processing all time windows")
     return True
@@ -132,6 +161,13 @@ def update_config_from_args(config, args):
         config['search']['start_time'] = args.start_time
     if args.end_time is not None:
         config['search']['end_time'] = args.end_time
+        
+    # Update storage section if it exists
+    if 'storage' in config:
+        if args.compression_threshold_mb is not None:
+            config['storage']['compression_threshold_mb'] = str(args.compression_threshold_mb)
+        if args.max_storage_mb is not None:
+            config['storage']['max_storage_mb'] = str(args.max_storage_mb)
 
 def run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger):
     """Run integrated search and delete process in parallel batches"""

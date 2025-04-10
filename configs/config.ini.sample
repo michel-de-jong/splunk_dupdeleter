@@ -1,17 +1,22 @@
 [general]
+max_workers = 4
+batch_size = 1000
 csv_dir = csv_output
 processed_dir = processed_csv
 log_file = splunk_duplicate_remover.log
-max_workers = 1     ## Max concurrent searches to fire to Splunk, start conservative
-batch_size = 5000   ## For better performance, separate into smaller batches of 5000 events
 
 [splunk]
-url = https://your-splunk-cloud-instance.splunkcloud.com
+url = https://your-splunk-instance.splunkcloud.com
 jwt_token = your_jwt_token_here
-verify_ssl = True
-ttl = 180            ## Job time-to-live in seconds
+verify_ssl = False
+ttl = 180
 
 [search]
-index = your_index_name
-start_time = 2025-04-06T00:00:00
-end_time = 2025-04-07T00:00:00
+index = main
+start_time = 2023-01-01T00:00:00
+end_time = 2023-01-02T00:00:00
+
+[storage]
+compression_threshold_mb = 50
+max_storage_mb = 500
+log_file = storage_manager.log
