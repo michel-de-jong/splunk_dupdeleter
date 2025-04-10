@@ -65,7 +65,7 @@ class SplunkAuthenticator:
             })
             
             # Set SSL verification based on config
-            verify_ssl = self.config.getboolean('splunk', 'verify_ssl', fallback=False)
+            verify_ssl = self.config.getboolean('splunk', 'verify_ssl', fallback=True)
             session.verify = verify_ssl
             
             # Test authentication by making a simple API call
