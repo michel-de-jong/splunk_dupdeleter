@@ -71,37 +71,44 @@ def main():
     # Setup logging
     logger = setup_logger(config, args.debug)
     logger.info("Starting Splunk Duplicate Remover")
+    logger.debug(f"Debug logging enabled: {args.debug}")
     
     # Log configuration settings
-    logger.debug(f"Configuration: max_workers={config['general'].get('max_workers')}, "
-                 f"batch_size={config['general'].get('batch_size')}, "
-                 f"url={config['splunk'].get('url')}, "
-                 f"verify_ssl={config['splunk'].get('verify_ssl')}, "
-                 f"index={config['search'].get('index')}, "
-                 f"start_time={config['search'].get('start_time')}, "
-                 f"end_time={config['search'].get('end_time')}, "
-                 f"compression_threshold_mb={config['storage'].get('compression_threshold_mb')}, "
-                 f"max_storage_mb={config['storage'].get('max_storage_mb')}")
+    logger.debug(f"Configuration sections: {list(config.sections())}")
+    logger.debug(f"Configuration details:")
+    for section in config.sections():
+        logger.debug(f"  Section [{section}]:")
+        for key, value in config[section].items():
+            # Mask sensitive values like tokens
+            if 'token' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
+                logger.debug(f"    {key}=MASKED_CREDENTIALS")
+            else:
+                logger.debug(f"    {key}={value}")
     
     # Initialize components
+    logger.debug("Initializing system components")
     stats_tracker = StatsTracker()
     authenticator = SplunkAuthenticator(config, logger)
     duplicate_finder = DuplicateFinder(config, logger, stats_tracker)
     duplicate_remover = DuplicateRemover(config, logger, stats_tracker)
     
     # Initialize storage manager
+    logger.debug("Initializing storage manager")
     storage_manager = StorageManager(config, logger)
     
     # Initialize file processor with storage manager
+    logger.debug("Initializing file processor with storage manager")
     file_processor = FileProcessor(config, logger, storage_manager)
     
     # Create output directories if they don't exist
     csv_dir = config.get('general', 'csv_dir', fallback='csv_output')
     processed_dir = config.get('general', 'processed_dir', fallback='processed_csv')
+    logger.debug(f"Ensuring output directories exist: {csv_dir}, {processed_dir}")
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(processed_dir, exist_ok=True)
     
     # Authenticate to Splunk
+    logger.debug("Authenticating to Splunk")
     session = authenticator.authenticate()
     if not session:
         logger.error("Authentication failed. Exiting.")
@@ -111,9 +118,12 @@ def main():
     index = config['search']['index']
     start_time = config['search']['start_time']
     end_time = config['search']['end_time']
+    logger.debug(f"Search parameters: index={index}, start_time={start_time}, end_time={end_time}")
     
     # Generate time windows for searches
+    logger.debug(f"Generating time windows from {start_time} to {end_time}")
     time_windows = duplicate_finder.generate_timespan_windows(start_time, end_time)
+    logger.debug(f"Generated {len(time_windows)} time windows")
     
     # Initial storage check
     logger.info("Performing initial storage maintenance check")
@@ -121,6 +131,8 @@ def main():
     
     # Run integrated process to find and remove duplicates in each time window
     logger.info(f"Starting integrated search and remove process for {len(time_windows)} time windows")
+    max_workers = int(config['general'].get('max_workers', 1))
+    logger.debug(f"Using {max_workers} worker threads for parallel processing")
     run_parallelized_process(duplicate_finder, duplicate_remover, file_processor, session, index, time_windows, logger)
     
     # Final storage check
@@ -128,6 +140,7 @@ def main():
     storage_manager.check_storage()
     
     logger.info("Completed processing all time windows")
+    logger.debug("Script execution completed successfully")
     return True
 
 def update_config_from_args(config, args):

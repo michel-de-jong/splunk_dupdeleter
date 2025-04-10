@@ -67,36 +67,50 @@ class StorageManager:
             bool: True if operations were successful
         """
         try:
+            self.logger.debug("Starting storage maintenance check")
+            
             # Check if directory exists
             if not os.path.exists(self.processed_dir):
                 self.logger.info(f"Processed directory does not exist: {self.processed_dir}")
+                self.logger.debug(f"Cannot perform maintenance on non-existent directory: {self.processed_dir}")
                 return True
             
             # Get the current size of the processed directory
             current_size_mb = self._get_directory_size_mb(self.processed_dir)
             self.logger.info(f"Current processed directory size: {current_size_mb:.2f} MB")
+            self.logger.debug(f"Compression threshold: {self.compression_threshold_mb} MB, Max storage: {self.max_storage_mb} MB")
             
             # First check: Compress subdirectories if total size exceeds threshold
             if current_size_mb > self.compression_threshold_mb:
                 self.logger.info(f"Size exceeds compression threshold ({self.compression_threshold_mb} MB), compressing subdirectories")
+                self.logger.debug(f"Size before compression: {current_size_mb:.2f} MB")
                 self._compress_subdirectories()
                 
                 # Recalculate size after compression
                 current_size_mb = self._get_directory_size_mb(self.processed_dir)
                 self.logger.info(f"Size after compression: {current_size_mb:.2f} MB")
+                self.logger.debug(f"Compression reduced size by {(current_size_mb - self._get_directory_size_mb(self.processed_dir)):.2f} MB")
+            else:
+                self.logger.debug(f"Size ({current_size_mb:.2f} MB) is below compression threshold ({self.compression_threshold_mb} MB)")
             
             # Second check: Delete oldest subdirectories if still over max storage
             if current_size_mb > self.max_storage_mb:
                 self.logger.info(f"Size exceeds maximum threshold ({self.max_storage_mb} MB), cleaning up oldest subdirectories")
+                self.logger.debug(f"Size before cleanup: {current_size_mb:.2f} MB")
                 self._cleanup_oldest_subdirectories(current_size_mb)
                 
                 # Log final size
                 final_size_mb = self._get_directory_size_mb(self.processed_dir)
                 self.logger.info(f"Final size after cleanup: {final_size_mb:.2f} MB")
+                self.logger.debug(f"Cleanup reduced size by {(current_size_mb - final_size_mb):.2f} MB")
+            else:
+                self.logger.debug(f"Size ({current_size_mb:.2f} MB) is below maximum threshold ({self.max_storage_mb} MB)")
             
+            self.logger.debug("Storage maintenance check completed successfully")
             return True
         except Exception as e:
             self.logger.error(f"Error during storage check: {str(e)}")
+            self.logger.debug(f"Storage check exception details: {type(e).__name__} - {str(e)}")
             return False
     
     def _get_directory_size_mb(self, directory):
