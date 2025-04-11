@@ -1,12 +1,12 @@
 [general]
-max_workers = 4
-batch_size = 1000
+max_workers = 1
+batch_size = 10000
 csv_dir = csv_output
 processed_dir = processed_csv
 log_file = splunk_duplicate_remover.log
 
 [splunk]
-url = https://your-splunk-instance.splunkcloud.com
+url = https://your-splunk-instance.splunkcloud.com:8089
 jwt_token = your_jwt_token_here
 verify_ssl = True
 ttl = 180

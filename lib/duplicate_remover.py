@@ -77,7 +77,7 @@ class DuplicateRemover:
         """
         try:
             # Get batch size from config, default to 5000 if not specified
-            batch_size = int(self.config['general'].get('batch_size', 5000))
+            batch_size = int(self.config['general'].get('batch_size', 10000))
             total_batches = (len(event_ids) + batch_size - 1) // batch_size
             
             self.logger.info(f"Splitting deletion into {total_batches} batches (max {batch_size} events per batch)")

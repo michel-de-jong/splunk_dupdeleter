@@ -2,6 +2,12 @@
 
 A tool for deleting duplicate events in Splunk.
 
+## Requirements
+
+1. Python3 (missing modules will, after confirmation, automatically be installed with pip)
+2. Connection from the running instance to the Splunk environment on port 8089
+3. A JWT Token from a user with the `can_delete` role
+
 ## Setup
 
 1. Create your own `config.ini` based on the sample file located in `configs/` directory
