@@ -3,8 +3,6 @@ Module for finding duplicate events in Splunk
 """
 
 from datetime import datetime, timedelta
-import os
-import time
 import csv
 from lib.logger import truncate_search_query
 

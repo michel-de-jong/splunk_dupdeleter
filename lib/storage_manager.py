@@ -7,7 +7,6 @@ import tarfile
 import shutil
 import logging
 from datetime import datetime
-import glob
 
 class StorageManager:
     """

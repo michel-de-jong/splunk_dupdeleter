@@ -4,7 +4,6 @@ Splunk authentication module with performance optimizations
 
 import requests
 import urllib3
-import logging
 from lib.logger import mask_credentials
 
 # Disable SSL warnings
