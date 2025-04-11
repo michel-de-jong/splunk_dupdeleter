@@ -6,7 +6,7 @@ A tool for deleting duplicate events in Splunk.
 
 1. Python3 (missing modules will, after confirmation, automatically be installed with pip)
 2. Connection from the running instance to the Splunk environment on port 8089
-3. A JWT Token from a user with the `can_delete` role
+3. A JWT Token from a user with the `can_delete` role and ability to search in the required index.
 
 ## Setup
 
@@ -21,6 +21,7 @@ A tool for deleting duplicate events in Splunk.
 - Uses "eventID" and "cd" fields from the CSV to create deletion searches
 - Polls every 5 seconds to check if deletion searches are finished
 - Logs the number of deleted events per search
+- Optional arguments can be used to run multiple CLI sessions of the script (for example when multiple indexes are in scope)
 
 ## Configuration
 
@@ -29,7 +30,7 @@ The performance can be tweaked with the following settings in `config.ini`:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `max_workers` | Maximum concurrent Splunk searches | 1 |
-| `batch` | Number of duplicated events to delete at once | 5000 |
+| `batch` | Number of duplicated events to delete at once | 10000 |
 | `TTL` | Time-to-live for find and delete searches (seconds) | 180 |
 
 ## Usage
