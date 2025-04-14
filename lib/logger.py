@@ -6,6 +6,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 import datetime
+import re
 
 class MessageTruncatingFilter(logging.Filter):
     """Filter that truncates long log messages"""
@@ -137,37 +138,42 @@ def mask_credentials(message):
     Returns:
         str: The masked log message
     """
-    # List of patterns to mask
+    if not isinstance(message, str):
+        return message
+    
+    # Define regex patterns for credential masking
     patterns = [
-        "jwt_token",
-        "token=",
-        "password=",
-        "auth=",
-        "Authorization: Bearer ",
-        "apikey=",
-        "api_key=",
-        "secret="
+        # Match JWT tokens (usually long base64 strings after jwt_token=)
+        (r'jwt_token=([^&\s"\']+)', r'jwt_token=MASKED_JWT_TOKEN'),
+        
+        # Match bearer tokens in Authorization headers
+        (r'Authorization:\s*Bearer\s+([^\s"\']+)', r'Authorization: Bearer MASKED_BEARER_TOKEN'),
+        
+        # Match api keys
+        (r'(api[_-]?key)=([^&\s"\']+)', r'\1=MASKED_API_KEY'),
+        (r'(apikey)=([^&\s"\']+)', r'\1=MASKED_API_KEY'),
+        
+        # Match passwords
+        (r'(password)=([^&\s"\']+)', r'\1=MASKED_PASSWORD'),
+        
+        # Match auth tokens
+        (r'(auth)=([^&\s"\']+)', r'\1=MASKED_AUTH_TOKEN'),
+        
+        # Match secrets
+        (r'(secret)=([^&\s"\']+)', r'\1=MASKED_SECRET'),
+        
+        # Match token parameters
+        (r'(token)=([^&\s"\']+)', r'\1=MASKED_TOKEN'),
+        
+        # Match JSON patterns (commonly found in API requests/responses)
+        (r'"(jwt_token|api[_-]?key|apikey|password|auth|secret|token)"\s*:\s*"([^"]*)"', r'"\1":"MASKED_CREDENTIALS"'),
+        (r'"(jwt_token|api[_-]?key|apikey|password|auth|secret|token)"\s*:\s*([^,"}\s][^,"}]*)', r'"\1":"MASKED_CREDENTIALS"'),
     ]
     
-    # Perform the masking
+    # Apply all patterns
     masked_message = message
-    for pattern in patterns:
-        if pattern in masked_message:
-            # Find the position of the pattern
-            pos = masked_message.find(pattern)
-            
-            # Find where the value ends (next space, comma, quote, etc.)
-            end_chars = [' ', ',', ';', '"', "'", '}', ')', '\n', '\r']
-            end_pos = len(masked_message)
-            
-            for char in end_chars:
-                next_char_pos = masked_message.find(char, pos + len(pattern))
-                if next_char_pos != -1 and next_char_pos < end_pos:
-                    end_pos = next_char_pos
-            
-            # Replace the actual value with MASKED_CREDENTIALS
-            value_start = pos + len(pattern)
-            masked_message = masked_message[:value_start] + "MASKED_CREDENTIALS" + masked_message[end_pos:]
+    for pattern, replacement in patterns:
+        masked_message = re.sub(pattern, replacement, masked_message, flags=re.IGNORECASE)
     
     return masked_message
 
@@ -182,6 +188,9 @@ def truncate_search_query(message, max_length=300):
     Returns:
         str: The message with truncated search query if applicable
     """
+    if not isinstance(message, str):
+        return message
+        
     # Patterns that might indicate a search query
     query_indicators = [
         "search=",
