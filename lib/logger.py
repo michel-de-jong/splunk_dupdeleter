@@ -41,9 +41,24 @@ def setup_logger(config, debug=False):
     log_dir = 'log'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
+    
+    # Create unique log filename based on index and time range
+    index = config.get('search', 'index', fallback='unknown')
+    start_time = config.get('search', 'start_time', fallback='unknown')
+    end_time = config.get('search', 'end_time', fallback='unknown')
+    
+    # Clean up timestamps for filename (replace characters that might be invalid in filenames)
+    start_time = start_time.replace(':', '-').replace(' ', '_')
+    end_time = end_time.replace(':', '-').replace(' ', '_')
+    
+    # Format the log filename
+    base_log_name = f"splunk_duplicate_remover-{index}_{start_time}_{end_time}"
+    log_file = config.get('general', 'log_file', fallback=f'{base_log_name}.log')
+    
+    # If the original log_file doesn't contain the index and time pattern, replace it
+    if 'splunk_duplicate_remover-' not in log_file:
+        log_file = f'{base_log_name}.log'
         
-    # Create handlers with log file in the log directory
-    log_file = config.get('general', 'log_file', fallback='splunk_duplicate_remover.log')
     log_path = os.path.join(log_dir, log_file)
     
     # Clear any existing handlers to avoid duplicates
@@ -75,9 +90,9 @@ def setup_logger(config, debug=False):
     
     # Create debug handler if debug mode is enabled
     if debug:
-        # Create unique debug log filename with timestamp
+        # Create unique debug log filename with timestamp and index
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        debug_log_file = f"debug_{timestamp}.log"
+        debug_log_file = f"debug_{base_log_name}_{timestamp}.log"
         debug_log_path = os.path.join(log_dir, debug_log_file)
         
         # Create debug file handler
