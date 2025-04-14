@@ -48,7 +48,23 @@ class StorageManager:
         """Setup dedicated logger for storage operations"""
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
-            
+        
+        # Get index and time range if available from config
+        index = self.config.get('search', 'index', fallback='unknown')
+        start_time = self.config.get('search', 'start_time', fallback='unknown')
+        end_time = self.config.get('search', 'end_time', fallback='unknown')
+        
+        # Clean up timestamps for filename
+        start_time = start_time.replace(':', '-').replace(' ', '_')
+        end_time = end_time.replace(':', '-').replace(' ', '_')
+        
+        # Format the storage log filename
+        storage_log_file = self.log_file
+        
+        # If using default log name, modify it to include index and time range
+        if storage_log_file == 'storage_manager.log':
+            storage_log_file = f"storage_manager-{index}_{start_time}_{end_time}.log"
+                
         logger = logging.getLogger('storage_manager')
         logger.setLevel(logging.INFO)
         
@@ -57,7 +73,7 @@ class StorageManager:
             logger.handlers.clear()
         
         # Create file handler
-        log_path = os.path.join(self.log_dir, self.log_file)
+        log_path = os.path.join(self.log_dir, storage_log_file)
         file_handler = logging.FileHandler(log_path)
         
         # Set format
