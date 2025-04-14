@@ -13,7 +13,7 @@ import os
 import concurrent.futures
 import time
 from lib.config_loader import ConfigLoader
-from lib.logger import setup_logger
+from lib.logger import setup_logger, mask_credentials
 from lib.authenticator import SplunkAuthenticator
 from lib.duplicate_finder import DuplicateFinder
 from lib.duplicate_remover import DuplicateRemover
@@ -71,16 +71,42 @@ def main():
     # Setup logging
     logger = setup_logger(config, args.debug)
     logger.info("Starting Splunk Duplicate Remover")
+    
+    # Log all parameters regardless of debug mode
+    logger.info("=== Configuration Parameters ===")
+    # General configuration
+    logger.info(f"Max Workers: {config['general'].get('max_workers', 'Not specified')}")
+    logger.info(f"Batch Size: {config['general'].get('batch_size', 'Not specified')}")
+    logger.info(f"CSV Directory: {config.get('general', 'csv_dir', fallback='csv_output')}")
+    logger.info(f"Processed Directory: {config.get('general', 'processed_dir', fallback='processed_csv')}")
+    
+    # Splunk configuration
+    logger.info(f"Splunk URL: {config['splunk'].get('url', 'Not specified')}")
+    # Don't log the JWT token
+    logger.info(f"Verify SSL: {config['splunk'].get('verify_ssl', 'Not specified')}")
+    logger.info(f"TTL: {config['splunk'].get('ttl', 'Not specified')} seconds")
+    
+    # Search parameters
+    logger.info(f"Index: {config['search'].get('index', 'Not specified')}")
+    logger.info(f"Start Time: {config['search'].get('start_time', 'Not specified')}")
+    logger.info(f"End Time: {config['search'].get('end_time', 'Not specified')}")
+    
+    # Storage configuration
+    logger.info(f"Compression Threshold: {config['storage'].get('compression_threshold_mb', 'Not specified')} MB")
+    logger.info(f"Max Storage: {config['storage'].get('max_storage_mb', 'Not specified')} MB")
+    logger.info("===============================")
+    
+    # Debug specific logs
     logger.debug(f"Debug logging enabled: {args.debug}")
     
-    # Log configuration settings
+    # Log full configuration details in debug mode
     logger.debug(f"Configuration sections: {list(config.sections())}")
     logger.debug(f"Configuration details:")
     for section in config.sections():
         logger.debug(f"  Section [{section}]:")
         for key, value in config[section].items():
             # Mask sensitive values like tokens
-            if 'token' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
+            if 'token' in key.lower() or 'secret' in key.lower() or 'password' in key.lower() or 'auth' in key.lower():
                 logger.debug(f"    {key}=MASKED_CREDENTIALS")
             else:
                 logger.debug(f"    {key}={value}")
