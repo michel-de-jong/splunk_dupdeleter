@@ -25,6 +25,7 @@ def check_modules():
         'datetime',           # For time window calculations
         'logging',            # For logging functionality
         'os',                 # For file operations
+        're',                 # For regex/masking operations
         'sys',                # For system interactions
         'time',               # For sleep and timing functions
         'shutil'              # For directory operations
