@@ -52,7 +52,7 @@ def setup_logger(config, debug=False):
     end_time = end_time.replace(':', '').replace(' ', '').replace('-', '')
     
     # Format the log filename
-    base_log_name = f"splunk_duplicate_remover-{index}_{start_time}_{end_time}"
+    base_log_name = f"splunk_duplicate_remover-{index}-{start_time}-{end_time}"
     log_file = config.get('general', 'log_file', fallback=f'{base_log_name}.log')
     
     # If the original log_file doesn't contain the index and time pattern, replace it
