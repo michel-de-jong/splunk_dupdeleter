@@ -48,8 +48,8 @@ def setup_logger(config, debug=False):
     end_time = config.get('search', 'end_time', fallback='unknown')
     
     # Clean up timestamps for filename (replace characters that might be invalid in filenames)
-    start_time = start_time.replace(':', '-').replace(' ', '_')
-    end_time = end_time.replace(':', '-').replace(' ', '_')
+    start_time = start_time.replace(':', '').replace(' ', '')
+    end_time = end_time.replace(':', '').replace(' ', '')
     
     # Format the log filename
     base_log_name = f"splunk_duplicate_remover-{index}_{start_time}_{end_time}"
