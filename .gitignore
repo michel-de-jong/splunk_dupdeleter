@@ -3,6 +3,7 @@ configs/config.ini
 csv_output/
 processed_csv/
 log/
+*.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,6 +1,6 @@
 # Splunk DupDeleter
 
-A tool for deleting duplicate events in Splunk.
+A tool for deleting duplicate events in Splunk. Visit https://deepwiki.com/michel-de-jong/splunk_dupdeleter for a detailed explanation.
 
 ## Requirements
 
